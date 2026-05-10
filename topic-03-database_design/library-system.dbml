@@ -108,8 +108,11 @@ Table books {
 Table book_copies {
   copy_id bigserial [pk, increment]
   book_id bigint [not null, ref: > books.book_id]
-  status text [not null, default: 'available', note: 'borrowed, reserved, available, lost']
-  barcode text [not null, unique]
+  // copy_status описує стан фізичного екземпляра. Коли borrowing активний,
+  // copy може бути marked as borrowed; після повернення - available.
+  // Детальний workflow належить до наступних implementation topics.
+  copy_status varchar(50) [not null, note: 'available, borrowed, reserved, lost']
+  barcode varchar(50) [not null, unique, note: 'ISBN-13 or internal barcode']
   shelf_location text [not null]
   condition text [not null, default: 'good', note: 'new, good, worn, damaged']
   acquired_date date [not null, default: `CURRENT_DATE`]
@@ -120,10 +123,12 @@ Table borrowings {
   borrowing_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   copy_id bigint [not null, ref: > book_copies.copy_id]
-  borrowed_at timestamp [not null]
-  due_date timestamp [not null]
-  returned_at timestamp
-  borrowing_status varchar(50) [note: 'active, returned, overdue']
+  borrowed_at timestamp [not null, note: 'Дата видачі книги']
+  due_date timestamp [not null, note: 'Дата, до якої книгу потрібно повернути']
+  returned_at timestamp [note: 'NULL, якщо книгу ще не повернули']
+  // overdue не зберігається як звичайний status у цій ERD foundation.
+  // Його потрібно обчислювати: due_date < current date AND returned_at IS NULL.
+  borrowing_status varchar(50) [note: 'active, returned']
 }
 
 // ======================================================
@@ -161,14 +166,22 @@ Table book_authors {
 
 // Резервація створюється для logical book title через book_id, а не для
 // конкретного physical copy. Конкретний copy визначається пізніше в borrowing logic.
+// Правило "only one pending reservation per member/book" краще реалізувати
+// пізніше в SQL DDL через partial unique index, бо DBML це погано виражає.
 Table reservations {
   reservation_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   book_id bigint [not null, ref: > books.book_id]
   reservation_date timestamp [not null]
   reservation_status varchar(50) [note: 'pending, fulfilled, cancelled']
+
+  indexes {
+    (member_id, book_id)
+  }
 }
 
+// Unique index нижче означає, що один member може залишити тільки один review
+// для одного book.
 Table reviews {
   review_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
@@ -176,6 +189,7 @@ Table reviews {
   rating int [not null, note: '1-5 stars']
   review_text text
   created_at timestamp [not null]
+  updated_at timestamp
 
   indexes {
     (member_id, book_id) [unique]
