@@ -105,10 +105,18 @@ Table books {
 }
 
 Table book_copies {
-  copy_id bigint [pk, increment]
-  book_id bigint
-  copy_number int
-  copy_status varchar(50)
+  copy_id bigserial [pk]
+  book_id bigint [not null, ref: > books.book_id]
+  status text [not null, default: 'available', note: 'borrowed, reserved, available, lost']
+  barcode text [not null, unique]
+  shelf_location text [not null]
+  condition text [not null, default: 'good', note: 'new, good, worn, damaged']
+  acquired_date date [not null, default: `CURRENT_DATE`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    (book_id, status) [name: 'idx_book_copies_book_status']
+  }
 }
 
 Table borrowings {
