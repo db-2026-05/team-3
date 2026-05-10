@@ -86,14 +86,18 @@
 // borrowings повинні посилатися на конкретний physical copy через copy_id.
 // Тому book_copies потрібна вже в architecture foundation для правильної
 // нормалізованої ER-моделі.
+// Iсторію читання вже можна отримати з borrowings: усі записи по member_id, особливо ті, де є returned_at, і будуть історією того, що людина брала раніше.
+// (borrowing_status, member_id) show me active/current loans for this member
+// (borrowing_status, copy_id) is this copy currently borrowed?
 
 Table members {
   member_id bigint [pk, increment]
-  first_name varchar(100)
-  last_name varchar(100)
+  first_name varchar(50)
+  last_name varchar(50)
   email varchar(255)
   phone varchar(50)
   registered_at timestamp
+  updated_at timestamp
 }
 
 Table books {
@@ -118,6 +122,12 @@ Table borrowings {
   borrowed_at timestamp
   due_date timestamp
   returned_at timestamp
+  borrowing_status varchar(50)
+
+  indexes {
+    (borrowing_status, member_id) [name: 'idx_borrowings_status_member']
+    (borrowing_status, copy_id) [name: 'idx_borrowings_status_copy']
+  }
 }
 
 // ======================================================
@@ -168,6 +178,10 @@ Table reviews {
   rating int
   review_text text
   created_at timestamp
+
+  indexes {
+    (member_id, rating, review_text)
+  }
 }
 
 // ======================================================
