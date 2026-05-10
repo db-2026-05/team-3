@@ -86,6 +86,7 @@
 // borrowings повинні посилатися на конкретний physical copy через copy_id.
 // Тому book_copies потрібна вже в architecture foundation для правильної
 // нормалізованої ER-моделі.
+// Iсторію читання вже можна отримати з borrowings: усі записи по member_id, особливо ті, де є returned_at, і будуть історією того, що людина брала раніше.
 
 Table members {
   member_id bigint [pk, increment]
