@@ -102,7 +102,7 @@ Table books {
   isbn varchar(50)
   publication_year int
   category_id bigint
-
+}
 
 Table book_copies {
   copy_id bigserial [pk, increment]
