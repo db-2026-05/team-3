@@ -86,15 +86,12 @@
 // borrowings повинні посилатися на конкретний physical copy через copy_id.
 // Тому book_copies потрібна вже в architecture foundation для правильної
 // нормалізованої ER-моделі.
-// Iсторію читання вже можна отримати з borrowings: усі записи по member_id, особливо ті, де є returned_at, і будуть історією того, що людина брала раніше.
-// (borrowing_status, member_id) show me active/current loans for this member
-// (borrowing_status, copy_id) is this copy currently borrowed?
 
 Table members {
   member_id bigint [pk, increment]
-  first_name varchar(50)
-  last_name varchar(50)
-  email varchar(255)
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  email varchar(255) [not null, unique]
   phone varchar(50)
   registered_at timestamp
   updated_at timestamp
@@ -102,10 +99,10 @@ Table members {
 
 Table books {
   book_id bigint [pk, increment]
-  title varchar(255)
-  isbn varchar(50)
+  title varchar(255) [not null]
+  isbn varchar(50) [not null, unique]
   publication_year int
-  category_id bigint
+  category_id bigint [not null, ref: > categories.category_id]
 }
 
 Table book_copies {
@@ -117,25 +114,16 @@ Table book_copies {
   condition text [not null, default: 'good', note: 'new, good, worn, damaged']
   acquired_date date [not null, default: `CURRENT_DATE`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
-
-  Indexes {
-    (book_id, status) [name: 'idx_book_copies_book_status']
-  }
 }
 
 Table borrowings {
   borrowing_id bigint [pk, increment]
-  member_id bigint
-  copy_id bigint
-  borrowed_at timestamp
-  due_date timestamp
+  member_id bigint [not null, ref: > members.member_id]
+  copy_id bigint [not null, ref: > book_copies.copy_id]
+  borrowed_at timestamp [not null]
+  due_date timestamp [not null]
   returned_at timestamp
-  borrowing_status varchar(50)
-
-  indexes {
-    (borrowing_status, member_id) [name: 'idx_borrowings_status_member']
-    (borrowing_status, copy_id) [name: 'idx_borrowings_status_copy']
-  }
+  borrowing_status varchar(50) [note: 'active, returned, overdue']
 }
 
 // ======================================================
@@ -146,18 +134,18 @@ Table borrowings {
 
 Table categories {
   category_id bigint [pk, increment]
-  category_name varchar(100)
+  category_name varchar(100) [not null, unique]
 }
 
 Table authors {
   author_id bigint [pk, increment]
-  first_name varchar(100)
-  last_name varchar(100)
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
 }
 
 Table book_authors {
-  book_id bigint
-  author_id bigint
+  book_id bigint [not null, ref: > books.book_id]
+  author_id bigint [not null, ref: > authors.author_id]
 
   indexes {
     (book_id, author_id) [pk]
@@ -171,43 +159,25 @@ Table book_authors {
 // Ці сутності розширюють базову модель. Детальні правила та робочі процеси
 // залишаються поза межами цієї архітектурної основи.
 
+// Резервація створюється для logical book title через book_id, а не для
+// конкретного physical copy. Конкретний copy визначається пізніше в borrowing logic.
 Table reservations {
   reservation_id bigint [pk, increment]
-  member_id bigint
-  book_id bigint
-  reservation_date timestamp
-  reservation_status varchar(50)
+  member_id bigint [not null, ref: > members.member_id]
+  book_id bigint [not null, ref: > books.book_id]
+  reservation_date timestamp [not null]
+  reservation_status varchar(50) [note: 'pending, fulfilled, cancelled']
 }
 
 Table reviews {
   review_id bigint [pk, increment]
-  member_id bigint
-  book_id bigint
-  rating int
+  member_id bigint [not null, ref: > members.member_id]
+  book_id bigint [not null, ref: > books.book_id]
+  rating int [not null, note: '1-5 stars']
   review_text text
-  created_at timestamp
+  created_at timestamp [not null]
 
   indexes {
-    (member_id, rating, review_text)
+    (member_id, book_id) [unique]
   }
 }
-
-// ======================================================
-// RELATIONSHIPS
-// ======================================================
-
-Ref: books.category_id > categories.category_id
-
-Ref: book_copies.book_id > books.book_id
-
-Ref: borrowings.member_id > members.member_id
-Ref: borrowings.copy_id > book_copies.copy_id
-
-Ref: book_authors.book_id > books.book_id
-Ref: book_authors.author_id > authors.author_id
-
-Ref: reservations.member_id > members.member_id
-Ref: reservations.book_id > books.book_id
-
-Ref: reviews.member_id > members.member_id
-Ref: reviews.book_id > books.book_id
