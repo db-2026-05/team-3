@@ -1,0 +1,155 @@
+// ======================================================
+// Library Management System - Topic 03 Database Design
+// ======================================================
+//
+// Scope:
+// - Architecture foundation for the ER diagram.
+// - Lightweight DBML for dbdiagram.io.
+// - Entities, normalization, PK/FK relationships, and MVP vs Final separation.
+//
+// Not included here:
+// - DDL scripts
+// - CRUD queries
+// - procedures, triggers, or workflow logic
+// - detailed teammate implementation rules
+//
+// Core architecture decisions:
+// - books represent logical book titles or editions.
+// - book_copies represent physical inventory items.
+// - borrowings reference copy_id to track the exact borrowed copy.
+// - authors and books are connected through book_authors.
+// - categories are separated into their own table.
+// - inventory quantities are calculated from book_copies rows.
+
+// ======================================================
+// TEAM RESPONSIBILITIES
+// ======================================================
+//
+// Novikov Volodymyr - Database Architect / Team Lead
+// Architecture focus:
+// - overall database architecture
+// - normalization
+// - PK/FK relationships
+// - ERD foundation
+// - schema consistency
+// - MVP vs Final Version separation
+//
+// Zhyryk Vitaliy - Inventory System
+// Main table: book_copies
+//
+// Volodymyr Fedorkiv - Borrowing & Reservation System
+// Main tables: members, borrowings, reservations
+//
+// Andrii Maidabura - Reviews, Testing & Documentation
+// Main table: reviews
+
+// ======================================================
+// MVP BASE TABLES
+// ======================================================
+//
+// MVP focus: basic members, logical books, and borrowing records.
+// book_copies is referenced here because borrowings must point to a
+// physical copy, not only to a logical book.
+
+Table members {
+  member_id bigint [pk, increment]
+  first_name varchar(100)
+  last_name varchar(100)
+  email varchar(255)
+  phone varchar(50)
+  registered_at timestamp
+}
+
+Table books {
+  book_id bigint [pk, increment]
+  title varchar(255)
+  isbn varchar(50)
+  publication_year int
+  category_id bigint
+}
+
+Table book_copies {
+  copy_id bigint [pk, increment]
+  book_id bigint
+  copy_number int
+  copy_status varchar(50)
+}
+
+Table borrowings {
+  borrowing_id bigint [pk, increment]
+  member_id bigint
+  copy_id bigint
+  borrowed_at timestamp
+  due_date timestamp
+  returned_at timestamp
+}
+
+// ======================================================
+// NORMALIZATION SUPPORT TABLES
+// ======================================================
+//
+// These tables prevent repeated author and category data in books.
+
+Table categories {
+  category_id bigint [pk, increment]
+  category_name varchar(100)
+}
+
+Table authors {
+  author_id bigint [pk, increment]
+  first_name varchar(100)
+  last_name varchar(100)
+}
+
+Table book_authors {
+  book_id bigint
+  author_id bigint
+
+  indexes {
+    (book_id, author_id) [pk]
+  }
+}
+
+// ======================================================
+// FINAL VERSION EXTENSION TABLES
+// ======================================================
+//
+// These entities extend the base model. Detailed workflows and rules
+// remain outside this architecture foundation.
+
+Table reservations {
+  reservation_id bigint [pk, increment]
+  member_id bigint
+  book_id bigint
+  reservation_date timestamp
+  reservation_status varchar(50)
+}
+
+Table reviews {
+  review_id bigint [pk, increment]
+  member_id bigint
+  book_id bigint
+  rating int
+  review_text text
+  created_at timestamp
+}
+
+// ======================================================
+// RELATIONSHIPS
+// ======================================================
+
+Ref: books.category_id > categories.category_id
+
+Ref: book_copies.book_id > books.book_id
+
+Ref: borrowings.member_id > members.member_id
+Ref: borrowings.copy_id > book_copies.copy_id
+
+Ref: book_authors.book_id > books.book_id
+Ref: book_authors.author_id > authors.author_id
+
+Ref: reservations.member_id > members.member_id
+Ref: reservations.book_id > books.book_id
+
+Ref: reviews.member_id > members.member_id
+Ref: reviews.book_id > books.book_id
