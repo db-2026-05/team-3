@@ -108,6 +108,7 @@ Table books {
 Table book_copies {
   copy_id bigserial [pk, increment]
   book_id bigint [not null, ref: > books.book_id]
+  copy_number int [not null, note: 'Порядковий номер копії для тієї ж книги (1, 2, 3...)']
   // copy_status описує стан фізичного екземпляра. Коли borrowing активний,
   // copy може бути marked as borrowed; після повернення - available.
   // Детальний workflow належить до наступних implementation topics.
@@ -126,9 +127,9 @@ Table borrowings {
   borrowed_at timestamp [not null, note: 'Дата видачі книги']
   due_date timestamp [not null, note: 'Дата, до якої книгу потрібно повернути']
   returned_at timestamp [note: 'NULL, якщо книгу ще не повернули']
-  // overdue не зберігається як звичайний status у цій ERD foundation.
-  // Його потрібно обчислювати: due_date < current date AND returned_at IS NULL.
-  borrowing_status varchar(50) [note: 'active, returned']
+  // active/returned не зберігається окремим borrowing_status.
+  // Active borrowing: returned_at IS NULL; returned borrowing: returned_at IS NOT NULL.
+  // overdue також обчислюється з due_date < current date AND returned_at IS NULL.
 }
 
 // ======================================================
@@ -152,8 +153,9 @@ Table book_authors {
   book_id bigint [not null, ref: > books.book_id]
   author_id bigint [not null, ref: > authors.author_id]
 
-  indexes {
-    (book_id, author_id) [pk]
+  // Composite primary key
+  Indexes {
+    (book_id, author_id) [pk, unique]
   }
 }
 
@@ -165,15 +167,18 @@ Table book_authors {
 // залишаються поза межами цієї архітектурної основи.
 
 // Резервація створюється для logical book title через book_id, а не для
-// конкретного physical copy. Конкретний copy визначається пізніше в borrowing logic.
+// конкретного physical copy. copy_id залишається NULL, поки резервація
+// перебуває в черзі; коли копію виділено, copy_id посилається на book_copies.
 // Правило "only one pending reservation per member/book" краще реалізувати
 // пізніше в SQL DDL через partial unique index, бо DBML це погано виражає.
 Table reservations {
   reservation_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   book_id bigint [not null, ref: > books.book_id]
+  copy_id bigint [ref: > book_copies.copy_id, note: 'NULL — резервація в черзі; заповнена — копія виділена']
   reservation_date timestamp [not null]
-  reservation_status varchar(50) [note: 'pending, fulfilled, cancelled']
+  reservation_status varchar(50) [note: 'pending, assigned, fulfilled, cancelled']
+  queue_position int [note: 'Позиція в черзі очікування']
 
   indexes {
     (member_id, book_id)
@@ -186,12 +191,12 @@ Table reviews {
   review_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   book_id bigint [not null, ref: > books.book_id]
-  rating int [not null, note: '1-5 stars']
+  rating int [not null, note: 'Значення від 1 до 5; перевіряти через CHECK constraint']
   review_text text
   created_at timestamp [not null]
   updated_at timestamp
 
   indexes {
-    (member_id, book_id) [unique]
+    (member_id, book_id) [unique, note: 'Один відгук на користувача за книгу']
   }
 }
