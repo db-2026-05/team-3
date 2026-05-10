@@ -41,24 +41,19 @@
 // Library Management System - Topic 03 Database Design
 // ======================================================
 //
-// Scope:
-// - Architecture foundation for the ER diagram.
-// - Lightweight DBML for dbdiagram.io.
-// - Entities, normalization, PK/FK relationships, and MVP vs Final separation.
+// Призначення:
+// - architecture foundation для ER-діаграми Variant 1.
+// - lightweight DBML для dbdiagram.io.
+// - фокус на entities, normalization та PK/FK relationships.
+// - чітке розділення між MVP tables та Final Version tables.
 //
-// Not included here:
-// - DDL scripts
-// - CRUD queries
-// - procedures, triggers, or workflow logic
-// - detailed teammate implementation rules
-//
-// Core architecture decisions:
-// - books represent logical book titles or editions.
-// - book_copies represent physical inventory items.
-// - borrowings reference copy_id to track the exact borrowed copy.
-// - authors and books are connected through book_authors.
-// - categories are separated into their own table.
-// - inventory quantities are calculated from book_copies rows.
+// Основні архітектурні рішення:
+// - books представляє логічні сутності книг.
+// - book_copies представляє фізичні екземпляри книг.
+// - borrowings посилається на конкретний physical copy через copy_id.
+// - authors та books пов’язані через junction table book_authors.
+// - categories винесені в окрему normalized table.
+// - кількість доступних книг рахується через book_copies.
 
 // ======================================================
 // TEAM RESPONSIBILITIES
@@ -87,8 +82,10 @@
 // ======================================================
 //
 // MVP focus: basic members, logical books, and borrowing records.
-// book_copies is referenced here because borrowings must point to a
-// physical copy, not only to a logical book.
+// Пояснення: book_copies формально належить до Final Version, але
+// borrowings повинні посилатися на конкретний physical copy через copy_id.
+// Тому book_copies потрібна вже в architecture foundation для правильної
+// нормалізованої ER-моделі.
 
 Table members {
   member_id bigint [pk, increment]
@@ -127,7 +124,7 @@ Table borrowings {
 // NORMALIZATION SUPPORT TABLES
 // ======================================================
 //
-// These tables prevent repeated author and category data in books.
+// Ці таблиці запобігають дублюванню author та category data в books.
 
 Table categories {
   category_id bigint [pk, increment]
@@ -153,8 +150,8 @@ Table book_authors {
 // FINAL VERSION EXTENSION TABLES
 // ======================================================
 //
-// These entities extend the base model. Detailed workflows and rules
-// remain outside this architecture foundation.
+// Ці сутності розширюють базову модель. Детальні правила та робочі процеси
+// залишаються поза межами цієї архітектурної основи.
 
 Table reservations {
   reservation_id bigint [pk, increment]
@@ -191,4 +188,4 @@ Ref: reservations.member_id > members.member_id
 Ref: reservations.book_id > books.book_id
 
 Ref: reviews.member_id > members.member_id
-Ref: reviews.book_id > books.book_id  
+Ref: reviews.book_id > books.book_id
