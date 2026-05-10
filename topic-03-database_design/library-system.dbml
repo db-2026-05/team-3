@@ -106,14 +106,13 @@ Table books {
 }
 
 Table book_copies {
-  copy_id bigserial [pk, increment]
+  copy_id bigint [pk, increment]
   book_id bigint [not null, ref: > books.book_id]
   copy_number int [not null, note: 'Порядковий номер копії для тієї ж книги (1, 2, 3...)']
   // copy_status описує стан фізичного екземпляра. Коли borrowing активний,
   // copy може бути marked as borrowed; після повернення - available.
   // Детальний workflow належить до наступних implementation topics.
   copy_status varchar(50) [not null, note: 'available, borrowed, reserved, lost']
-  barcode varchar(50) [not null, unique, note: 'ISBN-13 or internal barcode']
   condition text [not null, default: 'good', note: 'new, good, worn, damaged']
   acquired_date date [not null, default: `CURRENT_DATE`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
