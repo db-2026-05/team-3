@@ -68,14 +68,12 @@
 // - schema consistency
 // - MVP vs Final Version separation
 //
-// Zhyryk Vitaliy - Inventory System
-// Main table: book_copies
+// Zhyryk Vitaliy - Inventory System, Reviews, Testing & Documentation
+// Main table: book_copies, reviews
 //
 // Volodymyr Fedorkiv - Borrowing & Reservation System
 // Main tables: members, borrowings, reservations
 //
-// Andrii Maidabura - Reviews, Testing & Documentation
-// Main table: reviews
 
 // ======================================================
 // MVP BASE TABLES
