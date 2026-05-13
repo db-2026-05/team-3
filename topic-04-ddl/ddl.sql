@@ -105,6 +105,12 @@ CREATE TABLE book_copies (
     book_id BIGINT NOT NULL,
     copy_number INT NOT NULL,  -- Порядковий номер; унікальний у межах книги. Може мати розриви.
     copy_status VARCHAR(50) NOT NULL,
+    -- COMMENT: copy_status синхронізація здійснюється через:
+    --   1) Тригери при INSERT/UPDATE borrowings (Topic 05)
+    --   2) Процедура update_copy_status_after_return()
+    -- На цьому етапі (DDL) структура готова, логіка реалізується далі.
+
+
     acquired_date DATE NOT NULL DEFAULT CURRENT_DATE,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -156,11 +162,13 @@ CREATE TABLE borrowings (
 
     CONSTRAINT chk_borrowings_due_after_borrowed
         CHECK (due_date > DATE(borrowed_at)),
+    -- ЕТА: Розглянути, чи має смисл due_date >= DATE(borrowed_at) + 1 day
+    -- тобто мінімум 1 день.
 
     CONSTRAINT chk_borrowings_returned_after_borrowed
         CHECK (
             returned_at IS NULL
-            OR returned_at >= borrowed_at
+            OR returned_at > borrowed_at
         )
 );
 
@@ -292,6 +300,10 @@ CREATE UNIQUE INDEX uq_borrowings_copy_active
 -- покриває "знайти активне borrowing для копії" та "active borrowings of member".
 CREATE INDEX idx_borrowings_active
     ON borrowings(copy_id)
+    WHERE returned_at IS NULL;
+
+CREATE INDEX idx_borrowings_member_active
+    ON borrowings(member_id)
     WHERE returned_at IS NULL;
 
 CREATE INDEX idx_book_authors_author_id
