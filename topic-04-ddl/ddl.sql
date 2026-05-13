@@ -258,7 +258,7 @@ CREATE INDEX idx_book_copies_book_id
     ON book_copies(book_id);
 
 CREATE INDEX idx_book_copies_book_status
-    ON book_copies(book_id, status);
+    ON book_copies(book_id, copy_status);
 
 CREATE INDEX idx_borrowings_member_id
     ON borrowings(member_id);
