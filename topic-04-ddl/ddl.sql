@@ -27,6 +27,20 @@
 
 -- Add your DDL below this line
 
+-- ================================================================
+-- DROP TABLES (для розробки та тестування)
+-- ================================================================
+
+DROP TABLE IF EXISTS reviews CASCADE;
+DROP TABLE IF EXISTS reservations CASCADE;
+DROP TABLE IF EXISTS borrowings CASCADE;
+DROP TABLE IF EXISTS book_authors CASCADE;
+DROP TABLE IF EXISTS book_copies CASCADE;
+DROP TABLE IF EXISTS books CASCADE;
+DROP TABLE IF EXISTS authors CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS members CASCADE;
+
 -- ======================================================
 -- MEMBERS
 -- ======================================================
@@ -100,6 +114,7 @@ CREATE TABLE book_copies (
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
+    -- Кожна копія книги має унікальний порядковий номер в межах книги
     CONSTRAINT uq_book_copies_book_copy_number
         UNIQUE (book_id, copy_number),
 
@@ -109,7 +124,7 @@ CREATE TABLE book_copies (
     -- copy_status описує лише фізичний стан копії.
     -- Резервація — окрема концепція (таблиця reservations), не стан копії.
     CONSTRAINT chk_book_copies_status
-        CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable')),
+        CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable'))
 )
 
 -- ======================================================
@@ -138,9 +153,6 @@ CREATE TABLE borrowings (
 
     CONSTRAINT chk_borrowings_due_after_borrowed
         CHECK (due_date >= DATE(borrowed_at)),
-
-    CONSTRAINT chk_borrowings_due_is_future
-        CHECK (due_date >= CURRENT_DATE),
 
     CONSTRAINT chk_borrowings_returned_after_borrowed
         CHECK (
@@ -255,6 +267,10 @@ CREATE INDEX idx_books_category_id
 
 CREATE INDEX idx_book_copies_book_id
     ON book_copies(book_id);
+
+CREATE INDEX idx_book_copies_status
+    ON book_copies(book_id, copy_status)
+    WHERE copy_status = 'available';
 
 CREATE INDEX idx_borrowings_member_id
     ON borrowings(member_id);
