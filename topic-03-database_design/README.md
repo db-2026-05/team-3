@@ -26,7 +26,7 @@ The essential baseline — sufficient to **pass the project** and proves core da
 
 ### 🟣 Final Version — Enhanced Learning
 
-![Final](https://img.shields.io/badge/Level-Final%20Version-7c3aed?style=for-the-badge)
+![Final](https://dbdiagram.io/d/6a04a24f7a923b9472a5a18f)
 
 For teams wanting to **maximize learning** — advanced features and mastery of design concepts.
 
@@ -59,7 +59,7 @@ For your chosen variant, complete the following:
 
 ## 🎬 Additional Requirement — Video Recording
 
-![Video](https://img.shields.io/badge/Required-~2%20min%20per%20person-f59e0b?style=for-the-badge&logo=zoom)
+![Video](https://drive.google.com/file/d/1wwpIzFFa3rriK6XhkhuS3REZ01Mpo6iJ/view?usp=sharing)
 
 Each team member must record a **short video (~2 minutes)** describing:
 
