@@ -37,7 +37,7 @@ CREATE TABLE members (
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(50),
-    registered_at TIMESTAMP,
+    registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
 );
 
@@ -91,7 +91,7 @@ CREATE TABLE book_copies (
     book_id BIGINT NOT NULL,
     copy_number INT NOT NULL,
     copy_status VARCHAR(50) NOT NULL,
-    condition TEXT NOT NULL DEFAULT 'good',
+    copy_condition TEXT NOT NULL DEFAULT 'good',
     acquired_date DATE NOT NULL DEFAULT CURRENT_DATE,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -107,11 +107,13 @@ CREATE TABLE book_copies (
     CONSTRAINT chk_book_copies_copy_number
         CHECK (copy_number > 0),
 
+    -- copy_status описує лише фізичний стан копії.
+    -- Резервація — окрема концепція (таблиця reservations), не стан копії.
     CONSTRAINT chk_book_copies_status
-        CHECK (copy_status IN ('available', 'borrowed', 'reserved', 'lost')),
+        CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable')),
 
-    CONSTRAINT chk_book_copies_condition
-        CHECK (condition IN ('new', 'good', 'worn', 'damaged'))
+    CONSTRAINT chk_book_copies_copy_condition
+        CHECK (copy_condition IN ('new', 'good', 'worn', 'damaged'))
 );
 
 -- ======================================================
@@ -122,7 +124,7 @@ CREATE TABLE borrowings (
     borrowing_id BIGSERIAL PRIMARY KEY,
     member_id BIGINT NOT NULL,
     copy_id BIGINT NOT NULL,
-    borrowed_at TIMESTAMP NOT NULL,
+    borrowed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     due_date TIMESTAMP NOT NULL,
     returned_at TIMESTAMP,
 
@@ -181,8 +183,8 @@ CREATE TABLE reservations (
     member_id BIGINT NOT NULL,
     book_id BIGINT NOT NULL,
     copy_id BIGINT,
-    reservation_date TIMESTAMP NOT NULL,
-    reservation_status VARCHAR(50),
+    reservation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reservation_status VARCHAR(50) NOT NULL DEFAULT 'pending',
     queue_position INT,
 
     CONSTRAINT fk_reservations_member
@@ -204,10 +206,7 @@ CREATE TABLE reservations (
         ON DELETE SET NULL,
 
     CONSTRAINT chk_reservations_status
-        CHECK (
-            reservation_status IS NULL
-            OR reservation_status IN ('pending', 'assigned', 'fulfilled', 'cancelled')
-        ),
+        CHECK (reservation_status IN ('pending', 'assigned', 'fulfilled', 'cancelled')),
 
     CONSTRAINT chk_reservations_queue_position
         CHECK (
@@ -235,7 +234,7 @@ CREATE TABLE reviews (
     book_id BIGINT NOT NULL,
     rating INT NOT NULL,
     review_text TEXT,
-    created_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
 
     CONSTRAINT fk_reviews_member
@@ -276,11 +275,18 @@ CREATE INDEX idx_borrowings_copy_id
 CREATE INDEX idx_borrowings_due_date
     ON borrowings(due_date);
 
+-- Partial index для запитів активних видач (returned_at IS NULL):
+-- покриває "знайти активне borrowing для копії" та "active borrowings of member".
+CREATE INDEX idx_borrowings_active
+    ON borrowings(copy_id)
+    WHERE returned_at IS NULL;
+
 CREATE INDEX idx_book_authors_author_id
     ON book_authors(author_id);
 
-CREATE INDEX idx_reservations_member_id
-    ON reservations(member_id);
+-- idx_reservations_member_id навмисно НЕ створюється:
+-- prefix-index композитного idx_reservations_member_book вже покриває
+-- запити з фільтром лише по member_id.
 
 CREATE INDEX idx_reservations_book_id
     ON reservations(book_id);
