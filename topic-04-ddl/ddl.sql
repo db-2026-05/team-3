@@ -215,15 +215,6 @@ CREATE TABLE reservations (
         )
 );
 
-CREATE INDEX idx_reservations_member_book
-    ON reservations(member_id, book_id);
-
--- Partial unique index:
--- one pending reservation per member per book
-CREATE UNIQUE INDEX uq_reservations_pending_member_book
-    ON reservations(member_id, book_id)
-    WHERE reservation_status = 'pending';
-
 -- ======================================================
 -- REVIEWS
 -- ======================================================
@@ -266,6 +257,9 @@ CREATE INDEX idx_books_category_id
 CREATE INDEX idx_book_copies_book_id
     ON book_copies(book_id);
 
+CREATE INDEX idx_book_copies_book_status
+    ON book_copies(book_id, status);
+
 CREATE INDEX idx_borrowings_member_id
     ON borrowings(member_id);
 
@@ -293,6 +287,15 @@ CREATE INDEX idx_reservations_book_id
 
 CREATE INDEX idx_reservations_copy_id
     ON reservations(copy_id);
+
+CREATE INDEX idx_reservations_member_book
+    ON reservations(member_id, book_id);
+
+-- Partial unique index:
+-- one pending reservation per member per book
+CREATE UNIQUE INDEX uq_reservations_pending_member_book
+    ON reservations(member_id, book_id)
+    WHERE reservation_status = 'pending';
 
 CREATE INDEX idx_reviews_book_id
     ON reviews(book_id);
