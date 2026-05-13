@@ -38,7 +38,7 @@ CREATE TABLE members (
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(50),
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ======================================================
@@ -89,9 +89,8 @@ CREATE TABLE books (
 CREATE TABLE book_copies (
     copy_id BIGSERIAL PRIMARY KEY,
     book_id BIGINT NOT NULL,
-    copy_number INT NOT NULL,
+    copy_number INT NOT NULL,  -- Порядковий номер; унікальний у межах книги. Може мати розриви.
     copy_status VARCHAR(50) NOT NULL,
-    copy_condition TEXT NOT NULL DEFAULT 'good',
     acquired_date DATE NOT NULL DEFAULT CURRENT_DATE,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -111,10 +110,7 @@ CREATE TABLE book_copies (
     -- Резервація — окрема концепція (таблиця reservations), не стан копії.
     CONSTRAINT chk_book_copies_status
         CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable')),
-
-    CONSTRAINT chk_book_copies_copy_condition
-        CHECK (copy_condition IN ('new', 'good', 'worn', 'damaged'))
-);
+)
 
 -- ======================================================
 -- BORROWINGS
@@ -125,8 +121,8 @@ CREATE TABLE borrowings (
     member_id BIGINT NOT NULL,
     copy_id BIGINT NOT NULL,
     borrowed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    due_date TIMESTAMP NOT NULL,
-    returned_at TIMESTAMP,
+    due_date DATE NOT NULL,
+    returned_at TIMESTAMP,  -- NULL = активне borrowing; заповнена = повернено
 
     CONSTRAINT fk_borrowings_member
         FOREIGN KEY (member_id)
@@ -141,7 +137,10 @@ CREATE TABLE borrowings (
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_borrowings_due_after_borrowed
-        CHECK (due_date >= borrowed_at),
+        CHECK (due_date >= DATE(borrowed_at)),
+
+    CONSTRAINT chk_borrowings_due_is_future
+        CHECK (due_date >= CURRENT_DATE),
 
     CONSTRAINT chk_borrowings_returned_after_borrowed
         CHECK (
@@ -182,10 +181,10 @@ CREATE TABLE reservations (
     reservation_id BIGSERIAL PRIMARY KEY,
     member_id BIGINT NOT NULL,
     book_id BIGINT NOT NULL,
-    copy_id BIGINT,
+    copy_id BIGINT, -- NULL = резервація в черзі; заповнена = копія виділена
     reservation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reservation_status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    queue_position INT,
+    queue_position INT,  -- Позиція в черзі очікування (1, 2, 3...)
 
     CONSTRAINT fk_reservations_member
         FOREIGN KEY (member_id)
@@ -203,7 +202,7 @@ CREATE TABLE reservations (
         FOREIGN KEY (copy_id)
         REFERENCES book_copies(copy_id)
         ON UPDATE CASCADE
-        ON DELETE SET NULL,
+        ON DELETE RESTRICT,
 
     CONSTRAINT chk_reservations_status
         CHECK (reservation_status IN ('pending', 'assigned', 'fulfilled', 'cancelled')),
@@ -256,9 +255,6 @@ CREATE INDEX idx_books_category_id
 
 CREATE INDEX idx_book_copies_book_id
     ON book_copies(book_id);
-
-CREATE INDEX idx_book_copies_book_status
-    ON book_copies(book_id, copy_status);
 
 CREATE INDEX idx_borrowings_member_id
     ON borrowings(member_id);
