@@ -38,7 +38,7 @@ CREATE TABLE members (
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(50),
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 );
 
 -- ======================================================
@@ -226,7 +226,7 @@ CREATE TABLE reviews (
     rating INT NOT NULL,
     review_text TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_reviews_member
         FOREIGN KEY (member_id)
