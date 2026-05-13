@@ -111,7 +111,7 @@ Table book_copies {
   // copy може бути marked as borrowed; після повернення - available.
   // Детальний workflow належить до наступних implementation topics.
   copy_status varchar(50) [not null, note: 'available, borrowed, reserved, lost']
-  condition text [not null, default: 'good', note: 'new, good, worn, damaged']
+  copy_condition text [not null, default: 'good', note: 'new, good, worn, damaged']
   acquired_date date [not null, default: `CURRENT_DATE`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 }
