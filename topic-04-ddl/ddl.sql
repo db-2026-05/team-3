@@ -27,6 +27,20 @@
 
 -- Add your DDL below this line
 
+-- ================================================================
+-- DROP TABLES (для розробки та тестування)
+-- ================================================================
+
+DROP TABLE IF EXISTS reviews CASCADE;
+DROP TABLE IF EXISTS reservations CASCADE;
+DROP TABLE IF EXISTS borrowings CASCADE;
+DROP TABLE IF EXISTS book_authors CASCADE;
+DROP TABLE IF EXISTS book_copies CASCADE;
+DROP TABLE IF EXISTS books CASCADE;
+DROP TABLE IF EXISTS authors CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS members CASCADE;
+
 -- ======================================================
 -- MEMBERS
 -- ======================================================
@@ -38,7 +52,7 @@ CREATE TABLE members (
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(50),
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ======================================================
@@ -89,9 +103,14 @@ CREATE TABLE books (
 CREATE TABLE book_copies (
     copy_id BIGSERIAL PRIMARY KEY,
     book_id BIGINT NOT NULL,
-    copy_number INT NOT NULL,
+    copy_number INT NOT NULL,  -- Порядковий номер; унікальний у межах книги. Може мати розриви.
     copy_status VARCHAR(50) NOT NULL,
-    copy_condition TEXT NOT NULL DEFAULT 'good',
+    -- COMMENT: copy_status синхронізація здійснюється через:
+    --   1) Тригери при INSERT/UPDATE borrowings (Topic 05)
+    --   2) Процедура update_copy_status_after_return()
+    -- На цьому етапі (DDL) структура готова, логіка реалізується далі.
+
+
     acquired_date DATE NOT NULL DEFAULT CURRENT_DATE,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -101,19 +120,20 @@ CREATE TABLE book_copies (
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
+    -- Кожна копія книги має унікальний порядковий номер в межах книги
     CONSTRAINT uq_book_copies_book_copy_number
         UNIQUE (book_id, copy_number),
 
     CONSTRAINT chk_book_copies_copy_number
         CHECK (copy_number > 0),
 
+    CONSTRAINT chk_book_copies_acquired_date
+        CHECK (acquired_date <= CURRENT_DATE),
+
     -- copy_status описує лише фізичний стан копії.
     -- Резервація — окрема концепція (таблиця reservations), не стан копії.
     CONSTRAINT chk_book_copies_status
-        CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable')),
-
-    CONSTRAINT chk_book_copies_copy_condition
-        CHECK (copy_condition IN ('new', 'good', 'worn', 'damaged'))
+        CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable'))
 );
 
 -- ======================================================
@@ -125,8 +145,8 @@ CREATE TABLE borrowings (
     member_id BIGINT NOT NULL,
     copy_id BIGINT NOT NULL,
     borrowed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    due_date TIMESTAMP NOT NULL,
-    returned_at TIMESTAMP,
+    due_date DATE NOT NULL,
+    returned_at TIMESTAMP,  -- NULL = активне borrowing; заповнена = повернено
 
     CONSTRAINT fk_borrowings_member
         FOREIGN KEY (member_id)
@@ -141,12 +161,14 @@ CREATE TABLE borrowings (
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_borrowings_due_after_borrowed
-        CHECK (due_date >= borrowed_at),
+        CHECK (due_date > DATE(borrowed_at)),
+    -- ЕТА: Розглянути, чи має смисл due_date >= DATE(borrowed_at) + 1 day
+    -- тобто мінімум 1 день.
 
     CONSTRAINT chk_borrowings_returned_after_borrowed
         CHECK (
             returned_at IS NULL
-            OR returned_at >= borrowed_at
+            OR returned_at > borrowed_at
         )
 );
 
@@ -182,10 +204,10 @@ CREATE TABLE reservations (
     reservation_id BIGSERIAL PRIMARY KEY,
     member_id BIGINT NOT NULL,
     book_id BIGINT NOT NULL,
-    copy_id BIGINT,
+    copy_id BIGINT, -- NULL = резервація в черзі; заповнена = копія виділена
     reservation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reservation_status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    queue_position INT,
+    queue_position INT,  -- Позиція в черзі очікування (1, 2, 3...)
 
     CONSTRAINT fk_reservations_member
         FOREIGN KEY (member_id)
@@ -203,7 +225,7 @@ CREATE TABLE reservations (
         FOREIGN KEY (copy_id)
         REFERENCES book_copies(copy_id)
         ON UPDATE CASCADE
-        ON DELETE SET NULL,
+        ON DELETE RESTRICT,
 
     CONSTRAINT chk_reservations_status
         CHECK (reservation_status IN ('pending', 'assigned', 'fulfilled', 'cancelled')),
@@ -214,15 +236,6 @@ CREATE TABLE reservations (
             OR queue_position > 0
         )
 );
-
-CREATE INDEX idx_reservations_member_book
-    ON reservations(member_id, book_id);
-
--- Partial unique index:
--- one pending reservation per member per book
-CREATE UNIQUE INDEX uq_reservations_pending_member_book
-    ON reservations(member_id, book_id)
-    WHERE reservation_status = 'pending';
 
 -- ======================================================
 -- REVIEWS
@@ -235,7 +248,7 @@ CREATE TABLE reviews (
     rating INT NOT NULL,
     review_text TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_reviews_member
         FOREIGN KEY (member_id)
@@ -266,6 +279,10 @@ CREATE INDEX idx_books_category_id
 CREATE INDEX idx_book_copies_book_id
     ON book_copies(book_id);
 
+CREATE INDEX idx_book_copies_status
+    ON book_copies(book_id, copy_status)
+    WHERE copy_status = 'available';
+
 CREATE INDEX idx_borrowings_member_id
     ON borrowings(member_id);
 
@@ -275,10 +292,18 @@ CREATE INDEX idx_borrowings_copy_id
 CREATE INDEX idx_borrowings_due_date
     ON borrowings(due_date);
 
+CREATE UNIQUE INDEX uq_borrowings_copy_active
+    ON borrowings(copy_id)
+    WHERE returned_at IS NULL;
+
 -- Partial index для запитів активних видач (returned_at IS NULL):
 -- покриває "знайти активне borrowing для копії" та "active borrowings of member".
 CREATE INDEX idx_borrowings_active
     ON borrowings(copy_id)
+    WHERE returned_at IS NULL;
+
+CREATE INDEX idx_borrowings_member_active
+    ON borrowings(member_id)
     WHERE returned_at IS NULL;
 
 CREATE INDEX idx_book_authors_author_id
@@ -293,6 +318,15 @@ CREATE INDEX idx_reservations_book_id
 
 CREATE INDEX idx_reservations_copy_id
     ON reservations(copy_id);
+
+CREATE INDEX idx_reservations_member_book
+    ON reservations(member_id, book_id);
+
+-- Partial unique index:
+-- one pending reservation per member per book
+CREATE UNIQUE INDEX uq_reservations_pending_member_book
+    ON reservations(member_id, book_id)
+    WHERE reservation_status = 'pending';
 
 CREATE INDEX idx_reviews_book_id
     ON reviews(book_id);
