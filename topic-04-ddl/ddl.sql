@@ -121,11 +121,14 @@ CREATE TABLE book_copies (
     CONSTRAINT chk_book_copies_copy_number
         CHECK (copy_number > 0),
 
+    CONSTRAINT chk_book_copies_acquired_date
+        CHECK (acquired_date <= CURRENT_DATE),
+
     -- copy_status описує лише фізичний стан копії.
     -- Резервація — окрема концепція (таблиця reservations), не стан копії.
     CONSTRAINT chk_book_copies_status
         CHECK (copy_status IN ('available', 'borrowed', 'lost', 'unavailable'))
-)
+);
 
 -- ======================================================
 -- BORROWINGS
@@ -152,7 +155,7 @@ CREATE TABLE borrowings (
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_borrowings_due_after_borrowed
-        CHECK (due_date >= DATE(borrowed_at)),
+        CHECK (due_date > DATE(borrowed_at)),
 
     CONSTRAINT chk_borrowings_returned_after_borrowed
         CHECK (
@@ -280,6 +283,10 @@ CREATE INDEX idx_borrowings_copy_id
 
 CREATE INDEX idx_borrowings_due_date
     ON borrowings(due_date);
+
+CREATE UNIQUE INDEX uq_borrowings_copy_active
+    ON borrowings(copy_id)
+    WHERE returned_at IS NULL;
 
 -- Partial index для запитів активних видач (returned_at IS NULL):
 -- покриває "знайти активне borrowing для копії" та "active borrowings of member".
