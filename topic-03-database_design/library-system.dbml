@@ -107,10 +107,11 @@ Table book_copies {
   copy_id bigint [pk, increment]
   book_id bigint [not null, ref: > books.book_id]
   copy_number int [not null, note: 'Порядковий номер копії для тієї ж книги (1, 2, 3...)']
-  // copy_status описує стан фізичного екземпляра. Коли borrowing активний,
-  // copy може бути marked as borrowed; після повернення - available.
+  // copy_status описує лише фізичний стан екземпляра. Коли borrowing активний,
+  // copy позначається як borrowed; після повернення - available.
+  // Резервація — окрема концепція (таблиця reservations) і НЕ є станом копії.
   // Детальний workflow належить до наступних implementation topics.
-  copy_status varchar(50) [not null, note: 'available, borrowed, reserved, lost']
+  copy_status varchar(50) [not null, note: 'available, borrowed, lost, unavailable']
   copy_condition text [not null, default: 'good', note: 'new, good, worn, damaged']
   acquired_date date [not null, default: `CURRENT_DATE`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
