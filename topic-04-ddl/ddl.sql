@@ -27,4 +27,269 @@
 
 -- Add your DDL below this line
 
+-- ======================================================
+-- MEMBERS
+-- ======================================================
 
+CREATE TABLE members (
+    member_id BIGSERIAL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(50),
+    registered_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- ======================================================
+-- CATEGORIES
+-- ======================================================
+
+CREATE TABLE categories (
+    category_id BIGSERIAL PRIMARY KEY,
+    category_name VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- ======================================================
+-- AUTHORS
+-- ======================================================
+
+CREATE TABLE authors (
+    author_id BIGSERIAL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL
+);
+
+-- ======================================================
+-- BOOKS
+-- ======================================================
+
+CREATE TABLE books (
+    book_id BIGSERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    isbn VARCHAR(50) NOT NULL UNIQUE,
+    publication_year INT,
+    category_id BIGINT NOT NULL,
+    CONSTRAINT fk_books_category
+        FOREIGN KEY (category_id)
+        REFERENCES categories(category_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT chk_books_publication_year
+        CHECK (
+            publication_year IS NULL
+            OR publication_year BETWEEN 0 AND EXTRACT(YEAR FROM CURRENT_DATE)::INT + 1
+        )
+);
+
+-- ======================================================
+-- BOOK COPIES
+-- ======================================================
+
+CREATE TABLE book_copies (
+    copy_id BIGSERIAL PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    copy_number INT NOT NULL,
+    copy_status VARCHAR(50) NOT NULL,
+    condition TEXT NOT NULL DEFAULT 'good',
+    acquired_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_book_copies_book
+        FOREIGN KEY (book_id)
+        REFERENCES books(book_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_book_copies_book_copy_number
+        UNIQUE (book_id, copy_number),
+
+    CONSTRAINT chk_book_copies_copy_number
+        CHECK (copy_number > 0),
+
+    CONSTRAINT chk_book_copies_status
+        CHECK (copy_status IN ('available', 'borrowed', 'reserved', 'lost')),
+
+    CONSTRAINT chk_book_copies_condition
+        CHECK (condition IN ('new', 'good', 'worn', 'damaged'))
+);
+
+-- ======================================================
+-- BORROWINGS
+-- ======================================================
+
+CREATE TABLE borrowings (
+    borrowing_id BIGSERIAL PRIMARY KEY,
+    member_id BIGINT NOT NULL,
+    copy_id BIGINT NOT NULL,
+    borrowed_at TIMESTAMP NOT NULL,
+    due_date TIMESTAMP NOT NULL,
+    returned_at TIMESTAMP,
+
+    CONSTRAINT fk_borrowings_member
+        FOREIGN KEY (member_id)
+        REFERENCES members(member_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_borrowings_copy
+        FOREIGN KEY (copy_id)
+        REFERENCES book_copies(copy_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_borrowings_due_after_borrowed
+        CHECK (due_date >= borrowed_at),
+
+    CONSTRAINT chk_borrowings_returned_after_borrowed
+        CHECK (
+            returned_at IS NULL
+            OR returned_at >= borrowed_at
+        )
+);
+
+-- ======================================================
+-- BOOK_AUTHORS (many-to-many)
+-- ======================================================
+
+CREATE TABLE book_authors (
+    book_id BIGINT NOT NULL,
+    author_id BIGINT NOT NULL,
+
+    CONSTRAINT pk_book_authors
+        PRIMARY KEY (book_id, author_id),
+
+    CONSTRAINT fk_book_authors_book
+        FOREIGN KEY (book_id)
+        REFERENCES books(book_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_book_authors_author
+        FOREIGN KEY (author_id)
+        REFERENCES authors(author_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+-- ======================================================
+-- RESERVATIONS
+-- ======================================================
+
+CREATE TABLE reservations (
+    reservation_id BIGSERIAL PRIMARY KEY,
+    member_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
+    copy_id BIGINT,
+    reservation_date TIMESTAMP NOT NULL,
+    reservation_status VARCHAR(50),
+    queue_position INT,
+
+    CONSTRAINT fk_reservations_member
+        FOREIGN KEY (member_id)
+        REFERENCES members(member_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_reservations_book
+        FOREIGN KEY (book_id)
+        REFERENCES books(book_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_reservations_copy
+        FOREIGN KEY (copy_id)
+        REFERENCES book_copies(copy_id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
+
+    CONSTRAINT chk_reservations_status
+        CHECK (
+            reservation_status IS NULL
+            OR reservation_status IN ('pending', 'assigned', 'fulfilled', 'cancelled')
+        ),
+
+    CONSTRAINT chk_reservations_queue_position
+        CHECK (
+            queue_position IS NULL
+            OR queue_position > 0
+        )
+);
+
+CREATE INDEX idx_reservations_member_book
+    ON reservations(member_id, book_id);
+
+-- Partial unique index:
+-- one pending reservation per member per book
+CREATE UNIQUE INDEX uq_reservations_pending_member_book
+    ON reservations(member_id, book_id)
+    WHERE reservation_status = 'pending';
+
+-- ======================================================
+-- REVIEWS
+-- ======================================================
+
+CREATE TABLE reviews (
+    review_id BIGSERIAL PRIMARY KEY,
+    member_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
+    rating INT NOT NULL,
+    review_text TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP,
+
+    CONSTRAINT fk_reviews_member
+        FOREIGN KEY (member_id)
+        REFERENCES members(member_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_reviews_book
+        FOREIGN KEY (book_id)
+        REFERENCES books(book_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_reviews_member_book
+        UNIQUE (member_id, book_id),
+
+    CONSTRAINT chk_reviews_rating
+        CHECK (rating BETWEEN 1 AND 5)
+);
+
+-- ======================================================
+-- INDEXES
+-- ======================================================
+
+CREATE INDEX idx_books_category_id
+    ON books(category_id);
+
+CREATE INDEX idx_book_copies_book_id
+    ON book_copies(book_id);
+
+CREATE INDEX idx_borrowings_member_id
+    ON borrowings(member_id);
+
+CREATE INDEX idx_borrowings_copy_id
+    ON borrowings(copy_id);
+
+CREATE INDEX idx_borrowings_due_date
+    ON borrowings(due_date);
+
+CREATE INDEX idx_book_authors_author_id
+    ON book_authors(author_id);
+
+CREATE INDEX idx_reservations_member_id
+    ON reservations(member_id);
+
+CREATE INDEX idx_reservations_book_id
+    ON reservations(book_id);
+
+CREATE INDEX idx_reservations_copy_id
+    ON reservations(copy_id);
+
+CREATE INDEX idx_reviews_book_id
+    ON reviews(book_id);
+
+CREATE INDEX idx_reviews_member_id
+    ON reviews(member_id);
