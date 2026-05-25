@@ -1,0 +1,199 @@
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                     ER DIAGRAM — DBML                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+//
+// 📌 ЩО ПОТРІБНО ЗРОБИТИ
+// ──────────────────────────────────────────────────────────────────
+//  1. Побудуйте ER-діаграму вашої бази даних у будь-якому зручному
+//     інструменті — dbdiagram.io, draw.io, Lucidchart тощо.
+//
+//  2. Додайте зображення вашої фінальної ER-діаграми (можна вставити як посилання на зображення в інтернеті та обов'язково закомітити файл з діаграмою в репозиторій).
+//
+//  2. Кожен учасник команди підписує таблиці, які він створював:
+//
+//     [Ім'я] — назви таблиць через кому
+//     [Ім'я] — назви таблиць через кому
+//     [Ім'я] — назви таблиць через кому
+//
+//  4. У цьому файлі додайте DBML-код вашої схеми.
+//     Якщо використовуєте dbdiagram.io — там є кнопка експорту в DBML.
+//     Якщо draw.io або інший інструмент — скопіюйте схему вручну.
+//
+// ──────────────────────────────────────────────────────────────────
+// 💡 ПІДКАЗКА
+//
+//  DBML виглядає ось так (це лише приклад — не копіюйте):
+//
+//  Table users {
+//    id       bigint [primary key, increment]
+//    username varchar(100) [not null]
+//  }
+//
+//  Ref: posts.user_id > users.id
+//
+//  Повна документація: https://dbml.dbdiagram.io/docs/
+// ══════════════════════════════════════════════════════════════════
+
+
+// Вставте ваш DBML-код нижче 👇
+
+// ======================================================
+// Library Management System - Topic 03 Database Design
+// ======================================================
+//
+// Призначення:
+// - architecture foundation для ER-діаграми Variant 1.
+// - lightweight DBML для dbdiagram.io.
+// - фокус на entities, normalization та PK/FK relationships.
+// - чітке розділення між MVP tables та Final Version tables.
+//
+// Основні архітектурні рішення:
+// - books представляє логічні сутності книг.
+// - book_copies представляє фізичні екземпляри книг.
+// - borrowings посилається на конкретний physical copy через copy_id.
+// - authors та books пов’язані через junction table book_authors.
+// - categories винесені в окрему normalized table.
+// - кількість доступних книг рахується через book_copies.
+
+// ======================================================
+// TEAM RESPONSIBILITIES
+// ======================================================
+//
+// Novikov Volodymyr - Database Architect / Team Lead
+// Architecture focus:
+// - overall database architecture
+// - normalization
+// - PK/FK relationships
+// - ERD foundation
+// - schema consistency
+// - MVP vs Final Version separation
+//
+// Zhyryk Vitaliy - Inventory System, Reviews, Testing & Documentation
+// Main table: book_copies, reviews
+//
+// Volodymyr Fedorkiv - Borrowing & Reservation System
+// Main tables: members, borrowings, reservations
+//
+
+// ======================================================
+// MVP BASE TABLES
+// ======================================================
+//
+// MVP focus: basic members, logical books, and borrowing records.
+// Пояснення: book_copies формально належить до Final Version, але
+// borrowings повинні посилатися на конкретний physical copy через copy_id.
+// Тому book_copies потрібна вже в architecture foundation для правильної
+// нормалізованої ER-моделі.
+
+Table members {
+  member_id bigint [pk, increment]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  email varchar(255) [not null, unique]
+  phone varchar(50)
+  registered_at timestamp
+  updated_at timestamp
+}
+
+Table books {
+  book_id bigint [pk, increment]
+  title varchar(255) [not null]
+  isbn varchar(50) [not null, unique]
+  publication_year int
+  category_id bigint [not null, ref: > categories.category_id]
+}
+
+Table book_copies {
+  copy_id bigint [pk, increment]
+  book_id bigint [not null, ref: > books.book_id]
+  copy_number int [not null, note: 'Порядковий номер копії для тієї ж книги (1, 2, 3...)']
+  // copy_status описує лише фізичний стан екземпляра. Коли borrowing активний,
+  // copy позначається як borrowed; після повернення - available.
+  // Резервація — окрема концепція (таблиця reservations) і НЕ є станом копії.
+  // Детальний workflow належить до наступних implementation topics.
+  copy_status varchar(50) [not null, note: 'available, borrowed, lost, unavailable']
+  copy_condition text [not null, default: 'good', note: 'new, good, worn, damaged']
+  acquired_date date [not null, default: `CURRENT_DATE`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table borrowings {
+  borrowing_id bigint [pk, increment]
+  member_id bigint [not null, ref: > members.member_id]
+  copy_id bigint [not null, ref: > book_copies.copy_id]
+  borrowed_at timestamp [not null, note: 'Дата видачі книги']
+  due_date timestamp [not null, note: 'Дата, до якої книгу потрібно повернути']
+  returned_at timestamp [note: 'NULL, якщо книгу ще не повернули']
+  // active/returned не зберігається окремим borrowing_status.
+  // Active borrowing: returned_at IS NULL; returned borrowing: returned_at IS NOT NULL.
+  // overdue також обчислюється з due_date < current date AND returned_at IS NULL.
+}
+
+// ======================================================
+// NORMALIZATION SUPPORT TABLES
+// ======================================================
+//
+// Ці таблиці запобігають дублюванню author та category data в books.
+
+Table categories {
+  category_id bigint [pk, increment]
+  category_name varchar(100) [not null, unique]
+}
+
+Table authors {
+  author_id bigint [pk, increment]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+}
+
+Table book_authors {
+  book_id bigint [not null, ref: > books.book_id]
+  author_id bigint [not null, ref: > authors.author_id]
+
+  // Composite primary key
+  Indexes {
+    (book_id, author_id) [pk, unique]
+  }
+}
+
+// ======================================================
+// FINAL VERSION EXTENSION TABLES
+// ======================================================
+//
+// Ці сутності розширюють базову модель. Детальні правила та робочі процеси
+// залишаються поза межами цієї архітектурної основи.
+
+// Резервація створюється для logical book title через book_id, а не для
+// конкретного physical copy. copy_id залишається NULL, поки резервація
+// перебуває в черзі; коли копію виділено, copy_id посилається на book_copies.
+// Правило "only one pending reservation per member/book" краще реалізувати
+// пізніше в SQL DDL через partial unique index, бо DBML це погано виражає.
+Table reservations {
+  reservation_id bigint [pk, increment]
+  member_id bigint [not null, ref: > members.member_id]
+  book_id bigint [not null, ref: > books.book_id]
+  copy_id bigint [ref: > book_copies.copy_id, note: 'NULL — резервація в черзі; заповнена — копія виділена']
+  reservation_date timestamp [not null]
+  reservation_status varchar(50) [note: 'pending, assigned, fulfilled, cancelled']
+  queue_position int [note: 'Позиція в черзі очікування']
+
+  indexes {
+    (member_id, book_id)
+  }
+}
+
+// Unique index нижче означає, що один member може залишити тільки один review
+// для одного book.
+Table reviews {
+  review_id bigint [pk, increment]
+  member_id bigint [not null, ref: > members.member_id]
+  book_id bigint [not null, ref: > books.book_id]
+  rating int [not null, note: 'Значення від 1 до 5; перевіряти через CHECK constraint']
+  review_text text
+  created_at timestamp [not null]
+  updated_at timestamp
+
+  indexes {
+    (member_id, book_id) [unique, note: 'Один відгук на користувача за книгу']
+  }
+}

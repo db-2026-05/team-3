@@ -1,20 +1,31 @@
 # TEAMWORK - Topic 03 (Database Design)
 
 ## Склад команди
-- Команда: ...
-- Варіант предметної області: ...
+- Команда: Team 3
+- Варіант предметної області: Library Management System
 
 ## Таблиця внесків
+
 | Учасник | Роль у команді | Що зроблено | Артефакти / файли |
 |---|---|---|---|
-| ... | ... | ... | ... |
-| ... | ... | ... | ... |
-| ... | ... | ... | ... |
+| Novikov Volodymyr | Database Architect / Team Lead | Overall database architecture, normalization, PK/FK relationships, schema consistency validation, MVP vs Final Version separation | `library-system.dbml`, ERD foundation |
+| Zhyryk Vitaliy | Inventory System, Reviews, Testing & Documentation | Physical book copies, inventory tracking, availability logic, copy statuses; reviews and ratings; testing, documentation, presentation preparation | `book_copies`, `reviews`, project documentation |
+| Volodymyr Fedorkiv | Borrowing & Reservation System | Borrowing workflow, return logic, reservation workflow, reading history | `members`, `borrowings`, `reservations` |
+
 
 ## Контекст теми
-Опишіть, хто за яку частину відповідав.
+
+Проєкт був розподілений між учасниками команди за функціональними частинами бази даних.
+
+- **Novikov Volodymyr** відповідав за загальну архітектуру бази даних, нормалізацію, ER-модель, PK/FK зв’язки, узгодженість схеми та розділення MVP і Final Version частин проєкту.
+
+- **Zhyryk Vitaliy** відповідав за систему інвентаризації фізичних екземплярів книг (`book_copies`), логіку доступності книг та відстеження статусів екземплярів, а також за систему відгуків і рейтингів (`reviews`), тестування, документацію та підготовку матеріалів для презентації проєкту.
+
+- **Volodymyr Fedorkiv** відповідав за систему видачі та резервування книг (`members`, `borrowings`, `reservations`), включаючи borrowing workflow, return logic та reading history.
+
 
 ## Коротке обґрунтування вибору початкового варіанта
-1. Чому команда обрала саме цей варіант: ...
-2. Які навчальні цілі він покриває: ...
-3. Чому він кращий для вашої команди за інші доступні варіанти: ...
+1. Команда обрала Library Management System, тому що ця предметна область має зрозумілі сутності та реальні зв'язки між ними.
+2. Варіант покриває ключові навчальні цілі: нормалізацію, ER-діаграми, PK/FK зв’язки, one-to-many та many-to-many зв'язки.
+3. Цей варіант добре підходить для командної роботи, тому що його можна чисто розділити на архітектуру, інвентар, borrowing/reservations, reviews/testing/documentation.
+
