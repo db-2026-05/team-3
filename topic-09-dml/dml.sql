@@ -28,4 +28,86 @@
 
 -- Add your DML below this line
 
+-- ================================================================
+-- Table Book Copies
 
+-- Insert 10 copies for each book into book_copies
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+SELECT b.book_id, COALESCE(m.max_cn, 0) + gs.n as copy_number, 'available'
+FROM books b
+LEFT JOIN (
+    SELECT book_id, MAX(copy_number) AS max_cn
+    FROM book_copies
+    GROUP BY book_id
+) m ON m.book_id = b.book_id
+CROSS JOIN generate_series(1, 10) gs(n);
+
+-- Update book copy status by copy ID
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE copy_id = $2;
+
+-- Update status of all copies of a book by book ID
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id = $2;
+
+-- Update status of all copies of a book by title
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id IN (
+    SELECT book_id
+    FROM books
+    WHERE LOWER(TRIM(title)) = LOWER(TRIM($2))
+);
+
+-- Update status of all copies of a book by title and publication year
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id IN (
+    SELECT book_id
+    FROM books
+    WHERE LOWER(TRIM(title)) = LOWER(TRIM($2))
+      AND publication_year = $3
+);
+
+-- Update status of all copies of books within a publication year range (x-y)
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id IN (
+    SELECT book_id
+    FROM books
+    WHERE publication_year BETWEEN $2 AND $3
+);
+
+-- Update status of all copies of books published after year x (new books)
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id IN (
+    SELECT book_id
+    FROM books
+    WHERE publication_year > $2
+);
+
+-- Update status of all copies of books published before year x (old books)
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id IN (
+    SELECT book_id
+    FROM books
+    WHERE publication_year < $2
+);
+
+-- Update status of all copies of a book by book ID and current copy status
+UPDATE book_copies
+SET copy_status = $1, updated_at = CURRENT_TIMESTAMP
+WHERE book_id = $2 AND copy_status = 'available';
+
+
+-- The deletion for this table is not relevant to business logic as we want to keep a record of all copies for historical and inventory purposes.
+-- Instead of deleting records, we will update the copy_status to 'unavailable' or 'lost' to indicate that the copy is no longer available for circulation.
+-- This allows us to maintain data integrity and track the history of each copy without losing important information through deletion.
+-- If book will be deleted, the copies will be automatically deleted by ON DELETE CASCADE constraint on book_id foreign key in book_copies table,
+-- so we don't need to write a separate DELETE statement for book_copies.
+
+-- ================================================================
