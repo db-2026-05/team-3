@@ -29,8 +29,21 @@
 -- Add your DML below this line
 
 -- ================================================================
--- -- Table Book Copies
+-- CLEANUP (executed before data loading)
+-- ================================================================
 
+TRUNCATE TABLE borrowings CASCADE;
+TRUNCATE TABLE reviews CASCADE;
+TRUNCATE TABLE reservations CASCADE;
+TRUNCATE TABLE book_authors CASCADE;
+TRUNCATE TABLE book_copies CASCADE;
+TRUNCATE TABLE books CASCADE;
+TRUNCATE TABLE categories CASCADE;
+TRUNCATE TABLE authors CASCADE;
+TRUNCATE TABLE members CASCADE;
+
+-- ================================================================
+-- -- Table Book Copies
 
 -- ================================================================
 -- 1. REFERENCE DATA
@@ -62,7 +75,9 @@ INSERT INTO authors (author_id, first_name, last_name) VALUES
 (7, 'Mark', 'Twain'),
 (8, 'Ernest', 'Hemingway'),
 (9, 'Yuval', 'Harari'),
-(10, 'Agatha', 'Christie');
+(10, 'Agatha', 'Christie'),
+(11, 'J.R.R.', 'Tolkien'),
+(12, 'Frank', 'Herbert');
 
 -- ================================================================
 -- 3. BOOKS
@@ -85,32 +100,32 @@ INSERT INTO books (book_id, title, isbn, publication_year, category_id) VALUES
 -- ================================================================
 
 INSERT INTO book_authors (book_id, author_id) VALUES
-(1, 1),  -- 1984 → Orwell
-(2, 1),  -- Animal Farm → Orwell
-(3, 2),  -- Harry Potter → Rowling
-(4, 3),  -- The Hobbit → (kept as given in dataset)
-(5, 4),  -- Dune → Lee (dataset assumption as per DBML mismatch fix)
-(6, 9),  -- Sapiens → Harari
-(7, 5),  -- Foundation → Asimov
-(8, 3),  -- It → Stephen King
-(9, 6),  -- Pride and Prejudice → Jane Austen
-(10, 10); -- Agatha Christie
+(1, 1),
+(2, 1),
+(3, 2),
+(4, 11),
+(5, 12),
+(6, 9),
+(7, 5),
+(8, 3),
+(9, 6),
+(10, 10);
 
 -- ================================================================
 -- 5. MEMBERS (FIXED DBML STRUCTURE)
 -- ================================================================
 
-INSERT INTO members (member_id, first_name, last_name, email, phone) VALUES
-(1, 'Ivan', 'Petrenko', 'ivan@example.com', '111111111'),
-(2, 'Olha', 'Shevchenko', 'olha@example.com', '222222222'),
-(3, 'Andrii', 'Bondar', 'andrii@example.com', '333333333'),
-(4, 'Maria', 'Tkachenko', 'maria@example.com', '444444444'),
-(5, 'Dmytro', 'Kravets', 'dmytro@example.com', '555555555'),
-(6, 'Natalia', 'Koval', 'natalia@example.com', '666666666'),
-(7, 'Serhii', 'Melnyk', 'serhii@example.com', '777777777'),
-(8, 'Iryna', 'Polishchuk', 'iryna@example.com', '888888888'),
-(9, 'Oleh', 'Savchuk', 'oleh@example.com', '999999999'),
-(10, 'Kateryna', 'Romanenko', 'katya@example.com', '101010101');
+INSERT INTO members (member_id, first_name, last_name, email, phone, registered_at) VALUES
+(1, 'Ivan', 'Petrenko', 'ivan@example.com', '111111111', '2024-01-15'),
+(2, 'Olha', 'Shevchenko', 'olha@example.com', '222222222', '2024-01-16'),
+(3, 'Andrii', 'Bondar', 'andrii@example.com', '333333333', '2024-01-17'),
+(4, 'Maria', 'Tkachenko', 'maria@example.com', '444444444', '2024-01-18'),
+(5, 'Dmytro', 'Kravets', 'dmytro@example.com', '555555555', '2024-01-19'),
+(6, 'Natalia', 'Koval', 'natalia@example.com', '666666666', '2024-01-20'),
+(7, 'Serhii', 'Melnyk', 'serhii@example.com', '777777777', '2024-01-21'),
+(8, 'Iryna', 'Polishchuk', 'iryna@example.com', '888888888', '2024-01-22'),
+(9, 'Oleh', 'Savchuk', 'oleh@example.com', '999999999', '2024-01-23'),
+(10, 'Kateryna', 'Romanenko', 'katya@example.com', '101010101', '2024-01-24');
 
 -- ================================================================
 -- 6. BOOK COPIES
@@ -125,7 +140,7 @@ INSERT INTO book_copies (copy_id, book_id, copy_number, copy_status) VALUES
 (6, 3, 1, 'borrowed'),
 (7, 3, 2, 'available'),
 (8, 4, 1, 'available'),
-(9, 4, 2, 'lost'),
+(9, 4, 2, 'available'),
 (10, 5, 1, 'available'),
 (11, 5, 2, 'available'),
 (12, 6, 1, 'available'),
@@ -147,12 +162,13 @@ INSERT INTO borrowings (borrowing_id, member_id, copy_id, borrowed_at, due_date,
 (2, 2, 6, '2025-02-12', '2025-03-12', NULL),
 (3, 3, 14, '2025-02-15', '2025-03-15', NULL),
 (4, 4, 19, '2025-03-01', '2025-04-01', NULL),
-(5, 5, 9, '2025-03-05', '2025-03-20', '2025-03-18'),
+(5, 5, 10, '2025-03-05', '2025-03-20', '2025-03-18'),
 (6, 6, 1, '2025-03-10', '2025-04-10', NULL),
 (7, 7, 7, '2025-03-15', '2025-04-15', NULL),
-(8, 8, 10, '2025-03-20', '2025-04-20', NULL),
+(8, 8, 11, '2025-03-20', '2025-04-20', NULL),
 (9, 9, 16, '2025-03-25', '2025-04-25', NULL),
-(10, 10, 18, '2025-03-30', '2025-04-30', NULL);
+(10, 10, 18, '2025-03-30', '2025-04-30', NULL),
+(11, 1, 5, '2025-04-01', '2025-05-01', NULL);
 
 -- ================================================================
 -- 8. REVIEWS
