@@ -110,4 +110,173 @@ WHERE book_id = $2 AND copy_status = 'available';
 -- If book will be deleted, the copies will be automatically deleted by ON DELETE CASCADE constraint on book_id foreign key in book_copies table,
 -- so we don't need to write a separate DELETE statement for book_copies.
 
+-- Invalid inserts
+-- invalid status (CHECK constraint fails)
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 1, 'broken');
+
+-- invalid status typo
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 2, 'avaiable');
+
+-- copy_number = 0 (CHECK fails)
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 0, 'available');
+
+-- negative copy_number
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, -1, 'available');
+
+-- NULL book_id (NOT NULL fails)
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (NULL, 1, 'available');
+
+-- NULL copy_status (NOT NULL fails)
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 1, NULL);
+
+-- duplicate (book_id, copy_number) UNIQUE violation
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 1, 'available');
+
+-- non-existing book (FK fails)
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (9999, 1, 'available');
+
+-- string instead of number
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (1, 'first', 'available');
+
+-- zero copy_number edge invalid
+INSERT INTO book_copies (book_id, copy_number, copy_status)
+VALUES (2, 0, 'borrowed');
+
+-- ================================================================
+-- Reviews
+
+-- User add review
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES ($1, $2, $3, $4)
+
+-- Examples:
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES (
+    SELECT member_id FROM members LIMIT 1,
+    SELECT book_id FROM books LIMIT 1,
+    3,
+    NULL
+)
+
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES (1, 1, 4, NULL)
+
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES (1, 1, 1, NULL)
+
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES (1, 1, 5, NULL)
+
+-- Mass review generation
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+SELECT m.member_id, b.book_id, '3', 'not bad'
+FROM books b
+CROSS JOIN members m
+
+-- User change review's text
+UPDATE reviews
+SET review_text = $1
+WHERE review_id = $2
+
+-- Examples:
+UPDATE reviews
+SET review_text = 'nice book'
+WHERE review_id = 1
+
+-- User change review's text
+UPDATE reviews
+SET rating = $1
+WHERE review_id = $2
+
+-- Examples:
+UPDATE reviews
+SET rating = 2
+WHERE review_id = 1
+
+-- User change whole review data
+UPDATE reviews
+SET review_text = $1,
+rating = $2
+WHERE review_id = $3
+
+-- Examples:
+UPDATE reviews
+SET review_text = 'nice book',
+rating = 5
+WHERE review_id = 1
+
+-- User change rating of all reviews for one book
+UPDATE reviews
+SET rating = $1
+WHERE book_id = $2
+
+-- Examples:
+UPDATE reviews
+SET rating = 5
+WHERE book_id = 1
+
+-- User change all his reviews
+UPDATE reviews
+SET rating = $1
+WHERE member_id = $2
+
+-- Examples:
+UPDATE reviews
+SET rating = 5
+WHERE member_id = 1
+
+-- User delete the review
+DELETE FROM reviews
+WHERE review_id = $1
+
+-- Invalid inserts
+-- rating too low (CHECK fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (1, 1, 0);
+
+-- rating negative (CHECK fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (2, 2, -3);
+
+-- rating too high (CHECK fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (3, 3, 6);
+
+-- NULL rating (NOT NULL fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (4, 4, NULL);
+
+-- duplicate review (UNIQUE fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (1, 1, 5);
+
+-- duplicate again same pair (UNIQUE fails)
+INSERT INTO reviews (member_id, book_id, rating, review_text)
+VALUES (2, 2, 4, 'test');
+
+-- invalid member_id (FK fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (9999, 1, 4);
+
+-- invalid book_id (FK fails)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (1, 9999, 4);
+
+-- rating decimal (depends, should fail if INT strict)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (1, 2, 4.5);
+
+-- string rating (type error)
+INSERT INTO reviews (member_id, book_id, rating)
+VALUES (1, 2, 'five');
+
 -- ================================================================
