@@ -32,15 +32,15 @@
 -- CLEANUP (executed before data loading)
 -- ================================================================
 
-TRUNCATE TABLE borrowings CASCADE;
-TRUNCATE TABLE reviews CASCADE;
-TRUNCATE TABLE reservations CASCADE;
-TRUNCATE TABLE book_authors CASCADE;
-TRUNCATE TABLE book_copies CASCADE;
-TRUNCATE TABLE books CASCADE;
-TRUNCATE TABLE categories CASCADE;
-TRUNCATE TABLE authors CASCADE;
-TRUNCATE TABLE members CASCADE;
+DELETE FROM borrowings;
+DELETE FROM reviews;
+DELETE FROM reservations;
+DELETE FROM book_authors;
+DELETE FROM book_copies;
+DELETE FROM books;
+DELETE FROM categories;
+DELETE FROM authors;
+DELETE FROM members;
 
 -- ================================================================
 -- -- Table Book Copies
