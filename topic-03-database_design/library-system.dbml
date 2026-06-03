@@ -91,8 +91,8 @@ Table members {
   last_name varchar(100) [not null]
   email varchar(255) [not null, unique]
   phone varchar(50)
-  registered_at timestamp
-  updated_at timestamp
+  registered_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 }
 
 Table books {
@@ -111,8 +111,7 @@ Table book_copies {
   // copy позначається як borrowed; після повернення - available.
   // Резервація — окрема концепція (таблиця reservations) і НЕ є станом копії.
   // Детальний workflow належить до наступних implementation topics.
-  copy_status varchar(50) [not null, note: 'available, borrowed, lost, unavailable']
-  copy_condition text [not null, default: 'good', note: 'new, good, worn, damaged']
+  copy_status varchar(50) [not null, note: 'Enum: available | borrowed | lost | unavailable. Управляється через borrowings та логіку бізнесу']
   acquired_date date [not null, default: `CURRENT_DATE`]
   updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
 }
@@ -152,7 +151,7 @@ Table book_authors {
 
   // Composite primary key
   Indexes {
-    (book_id, author_id) [pk, unique]
+    (book_id, author_id) [pk]
   }
 }
 
@@ -172,7 +171,7 @@ Table reservations {
   reservation_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   book_id bigint [not null, ref: > books.book_id]
-  copy_id bigint [ref: > book_copies.copy_id, note: 'NULL — резервація в черзі; заповнена — копія виділена']
+  copy_id bigint [ref: > book_copies.copy_id, note: 'NULL якщо у черзі, значення якщо копія виділена']
   reservation_date timestamp [not null]
   reservation_status varchar(50) [note: 'pending, assigned, fulfilled, cancelled']
   queue_position int [note: 'Позиція в черзі очікування']
@@ -188,7 +187,7 @@ Table reviews {
   review_id bigint [pk, increment]
   member_id bigint [not null, ref: > members.member_id]
   book_id bigint [not null, ref: > books.book_id]
-  rating int [not null, note: 'Значення від 1 до 5; перевіряти через CHECK constraint']
+  rating int [not null, note: 'Значення від 1 до 5 включно (CHECK: rating BETWEEN 1 AND 5)']
   review_text text
   created_at timestamp [not null]
   updated_at timestamp
