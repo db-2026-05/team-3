@@ -35,13 +35,13 @@
 -- ================================================================
 -- SQL VIEWS (TOPIC 10)
 -- Library Management System
--- Requires: ddl.sql executed first (schema must exist)
+-- Requires: ddl.sql executed first
 -- ================================================================
 
 
 -- ================================================================
 -- HORIZONTAL VIEW
--- Purpose: базовий каталог книг (без фільтрації рядків)
+-- Purpose: повний каталог книг (без фільтрації рядків)
 -- ================================================================
 CREATE OR REPLACE VIEW book_catalog AS
 SELECT
@@ -56,13 +56,12 @@ ORDER BY title;
 
 -- ================================================================
 -- VERTICAL VIEW
--- Purpose: останні відгуки (фільтрація рядків)
+-- Purpose: останні відгуки (фільтр по часу)
 -- ================================================================
 CREATE OR REPLACE VIEW recent_reviews AS
 SELECT *
 FROM reviews
-WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-ORDER BY created_at DESC;
+WHERE created_at >= CURRENT_DATE - INTERVAL '30 days';
 
 
 -- ================================================================
@@ -80,7 +79,7 @@ WHERE copy_status = 'available';
 
 -- ================================================================
 -- JOIN VIEW
--- Purpose: повні дані про відгуки (user + book + review)
+-- Purpose: повна інформація про відгуки (user + book + review)
 -- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
@@ -98,19 +97,21 @@ JOIN books b ON b.book_id = r.book_id;
 
 
 -- ================================================================
--- SUBQUERY VIEW (CORRECT ANALYTICAL USE)
--- Purpose: середній рейтинг книги (WINDOW FUNCTION — optimal)
+-- SUBQUERY VIEW (REAL SUBQUERY, NOT WINDOW FUNCTION)
+-- Purpose: аналітика — кількість активних книг у користувача
 -- ================================================================
-CREATE OR REPLACE VIEW review_with_book_avg AS
+CREATE OR REPLACE VIEW members_with_book_count AS
 SELECT
-    review_id,
-    member_id,
-    book_id,
-    rating,
-    review_text,
-    AVG(rating) OVER (PARTITION BY book_id)
-        ::NUMERIC(3,2) AS book_avg_rating
-FROM reviews;
+    m.member_id,
+    m.first_name || ' ' || m.last_name AS member_name,
+    (
+        SELECT COUNT(*)
+        FROM borrowings br
+        JOIN book_copies bc ON bc.copy_id = br.copy_id
+        WHERE br.member_id = m.member_id
+          AND br.returned_at IS NULL
+    ) AS active_books_count
+FROM members m;
 
 
 -- ================================================================
@@ -131,13 +132,17 @@ JOIN books b ON b.book_id = s.book_id;
 
 -- ================================================================
 -- UNION VIEW: library_activity
--- Purpose: історія активності бібліотеки
+-- Purpose:
+-- повна історія активності бібліотеки (видачі + резервації)
 --
 -- WHY UNION ALL:
 -- - borrowings і reservations — різні домени даних
--- - дублікати між таблицями НЕ є логічними дублями
--- - UNION ALL швидший (без deduplication)
--- - дозволяє аналітику по timeline (member_id + activity_date)
+-- - це НЕ дублікати, а різні типи подій
+-- - UNION ALL зберігає повну історію без втрат
+-- - UNION був би неправильний (може видаляти події)
+--
+-- IMPORTANT:
+-- ВИРІВНЯНА СТРУКТУРА ОБОХ SELECT
 -- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
 
@@ -146,7 +151,8 @@ SELECT
     m.first_name || ' ' || m.last_name AS member_name,
     b.title,
     'BORROWING' AS activity_type,
-    br.borrowed_at AS activity_date
+    br.borrowed_at AS activity_date,
+    'active' AS status
 FROM borrowings br
 JOIN members m ON m.member_id = br.member_id
 JOIN book_copies bc ON bc.copy_id = br.copy_id
@@ -160,7 +166,8 @@ SELECT
     m.first_name || ' ' || m.last_name AS member_name,
     b.title,
     'RESERVATION' AS activity_type,
-    r.reservation_date AS activity_date
+    r.reservation_date AS activity_date,
+    r.reservation_status AS status
 FROM reservations r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id
@@ -170,10 +177,10 @@ WHERE r.reservation_status IN ('pending', 'assigned');
 -- ================================================================
 -- CHECK OPTION VIEW
 -- Purpose:
--- дозволяє тільки high-quality reviews (rating >= 4)
+-- дозволяє змінювати тільки high-rated reviews (>=4)
 --
--- CHECK OPTION:
--- гарантує що INSERT/UPDATE не виведе рядок з view
+-- BUSINESS RULE:
+-- quality control layer для модерації відгуків
 -- ================================================================
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
@@ -188,10 +195,14 @@ FROM reviews
 WHERE rating >= 4
 WITH CHECK OPTION;
 
+-- DEMO (optional):
+-- INSERT INTO high_rated_reviews (member_id, book_id, rating, review_text, created_at, updated_at)
+-- VALUES (1, 1, 2, 'Bad book', NOW(), NOW());
+-- → ERROR: new row violates check option
+
 
 -- ================================================================
--- ANALYTICS VIEW: popular_books
--- Purpose: рейтинг популярності книг
+-- ANALYTICS VIEW
 -- ================================================================
 CREATE OR REPLACE VIEW popular_books AS
 SELECT
@@ -236,7 +247,7 @@ JOIN books b ON b.book_id = bc.book_id;
 
 
 -- ================================================================
--- OPTIONAL: overdue_borrowings (FIX for demo issue)
+-- OPTIONAL: overdue borrowings
 -- ================================================================
 CREATE OR REPLACE VIEW overdue_borrowings AS
 SELECT
@@ -255,12 +266,12 @@ WHERE br.returned_at IS NULL
 
 
 -- ================================================================
--- DEMO QUERIES (FULLY DETERMINISTIC)
+-- DEMO QUERIES (DETERMINISTIC OUTPUT)
 -- ================================================================
 SELECT * FROM book_catalog ORDER BY book_id LIMIT 3;
 SELECT * FROM recent_reviews ORDER BY created_at DESC LIMIT 3;
 SELECT * FROM available_copies ORDER BY copy_id LIMIT 3;
 SELECT * FROM member_review ORDER BY review_id LIMIT 3;
-SELECT * FROM review_with_book_avg ORDER BY review_id LIMIT 3;
+SELECT * FROM members_with_book_count ORDER BY member_id LIMIT 3;
 SELECT * FROM popular_books ORDER BY review_count DESC LIMIT 3;
 SELECT * FROM overdue_borrowings ORDER BY days_overdue DESC LIMIT 5;
