@@ -131,30 +131,33 @@ INSERT INTO members (member_id, first_name, last_name, email, phone, registered_
 -- 6. BOOK COPIES
 -- ================================================================
 
--- NOTE: copy_status is kept consistent with the active borrowings below
--- (every copy that has a borrowing with returned_at IS NULL is 'borrowed').
--- In later topics this synchronization is automated via triggers/procedures.
-INSERT INTO book_copies (copy_id, book_id, copy_number, copy_status) VALUES
-(1, 1, 1, 'borrowed'),
-(2, 1, 2, 'borrowed'),
-(3, 1, 3, 'available'),
-(4, 2, 1, 'available'),
-(5, 2, 2, 'borrowed'),
-(6, 3, 1, 'borrowed'),
-(7, 3, 2, 'borrowed'),
-(8, 4, 1, 'available'),
-(9, 4, 2, 'available'),
-(10, 5, 1, 'available'),
-(11, 5, 2, 'borrowed'),
-(12, 6, 1, 'available'),
-(13, 6, 2, 'available'),
-(14, 7, 1, 'borrowed'),
-(15, 7, 2, 'available'),
-(16, 8, 1, 'borrowed'),
-(17, 8, 2, 'available'),
-(18, 9, 1, 'borrowed'),
-(19, 10, 1, 'borrowed'),
-(20, 10, 2, 'available');
+-- NOTE 1: copy_status is kept consistent with the active borrowings below
+--   (every copy that has a borrowing with returned_at IS NULL is 'borrowed').
+--   In later topics this synchronization is automated via triggers/procedures.
+-- NOTE 2: acquired_date/updated_at are set explicitly to historical values
+--   (all earlier than the first borrowing) so a copy is never "acquired"
+--   after it was lent out; otherwise the DEFAULT would stamp them with today.
+INSERT INTO book_copies (copy_id, book_id, copy_number, copy_status, acquired_date, updated_at) VALUES
+(1, 1, 1, 'borrowed', '2023-03-10', '2023-03-10'),
+(2, 1, 2, 'borrowed', '2023-03-10', '2023-03-10'),
+(3, 1, 3, 'available', '2023-05-22', '2023-05-22'),
+(4, 2, 1, 'available', '2023-04-01', '2023-04-01'),
+(5, 2, 2, 'borrowed', '2023-04-01', '2023-04-01'),
+(6, 3, 1, 'borrowed', '2023-06-15', '2023-06-15'),
+(7, 3, 2, 'borrowed', '2023-06-15', '2023-06-15'),
+(8, 4, 1, 'available', '2023-07-20', '2023-07-20'),
+(9, 4, 2, 'available', '2023-07-20', '2023-07-20'),
+(10, 5, 1, 'available', '2023-08-05', '2023-08-05'),
+(11, 5, 2, 'borrowed', '2023-08-05', '2023-08-05'),
+(12, 6, 1, 'available', '2023-09-12', '2023-09-12'),
+(13, 6, 2, 'available', '2023-09-12', '2023-09-12'),
+(14, 7, 1, 'borrowed', '2023-10-01', '2023-10-01'),
+(15, 7, 2, 'available', '2023-10-01', '2023-10-01'),
+(16, 8, 1, 'borrowed', '2023-11-18', '2023-11-18'),
+(17, 8, 2, 'available', '2023-11-18', '2023-11-18'),
+(18, 9, 1, 'borrowed', '2024-01-09', '2024-01-09'),
+(19, 10, 1, 'borrowed', '2024-02-14', '2024-02-14'),
+(20, 10, 2, 'available', '2024-02-14', '2024-02-14');
 
 -- ================================================================
 -- 7. BORROWINGS (FIXED DBML FIELDS)
