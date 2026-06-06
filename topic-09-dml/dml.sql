@@ -112,17 +112,20 @@ INSERT INTO book_authors (book_id, author_id) VALUES
 -- 5. MEMBERS (FIXED DBML STRUCTURE)
 -- ================================================================
 
-INSERT INTO members (member_id, first_name, last_name, email, phone, registered_at) VALUES
-(1, 'Ivan', 'Petrenko', 'ivan@example.com', '111111111', '2024-01-15'),
-(2, 'Olha', 'Shevchenko', 'olha@example.com', '222222222', '2024-01-16'),
-(3, 'Andrii', 'Bondar', 'andrii@example.com', '333333333', '2024-01-17'),
-(4, 'Maria', 'Tkachenko', 'maria@example.com', '444444444', '2024-01-18'),
-(5, 'Dmytro', 'Kravets', 'dmytro@example.com', '555555555', '2024-01-19'),
-(6, 'Natalia', 'Koval', 'natalia@example.com', '666666666', '2024-01-20'),
-(7, 'Serhii', 'Melnyk', 'serhii@example.com', '777777777', '2024-01-21'),
-(8, 'Iryna', 'Polishchuk', 'iryna@example.com', '888888888', '2024-01-22'),
-(9, 'Oleh', 'Savchuk', 'oleh@example.com', '999999999', '2024-01-23'),
-(10, 'Kateryna', 'Romanenko', 'katya@example.com', '101010101', '2024-01-24');
+-- updated_at is set equal to registered_at at seed time so the audit
+-- columns stay temporally consistent (otherwise the DEFAULT would stamp
+-- them with the load date, which post-dates the historical registered_at).
+INSERT INTO members (member_id, first_name, last_name, email, phone, registered_at, updated_at) VALUES
+(1, 'Ivan', 'Petrenko', 'ivan@example.com', '111111111', '2024-01-15', '2024-01-15'),
+(2, 'Olha', 'Shevchenko', 'olha@example.com', '222222222', '2024-01-16', '2024-01-16'),
+(3, 'Andrii', 'Bondar', 'andrii@example.com', '333333333', '2024-01-17', '2024-01-17'),
+(4, 'Maria', 'Tkachenko', 'maria@example.com', '444444444', '2024-01-18', '2024-01-18'),
+(5, 'Dmytro', 'Kravets', 'dmytro@example.com', '555555555', '2024-01-19', '2024-01-19'),
+(6, 'Natalia', 'Koval', 'natalia@example.com', '666666666', '2024-01-20', '2024-01-20'),
+(7, 'Serhii', 'Melnyk', 'serhii@example.com', '777777777', '2024-01-21', '2024-01-21'),
+(8, 'Iryna', 'Polishchuk', 'iryna@example.com', '888888888', '2024-01-22', '2024-01-22'),
+(9, 'Oleh', 'Savchuk', 'oleh@example.com', '999999999', '2024-01-23', '2024-01-23'),
+(10, 'Kateryna', 'Romanenko', 'katya@example.com', '101010101', '2024-01-24', '2024-01-24');
 
 -- ================================================================
 -- 6. BOOK COPIES
