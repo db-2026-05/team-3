@@ -35,14 +35,13 @@
 -- ================================================================
 -- SQL VIEWS (TOPIC 10)
 -- Library Management System
--- IMPORTANT: Requires schema from ddl.sql
--- Tables: members, books, reviews, borrowings, book_copies, reservations
+-- Schema required: ddl.sql (must be executed first)
 -- ================================================================
 
 
 -- ================================================================
 -- HORIZONTAL VIEW: book_metadata
--- Purpose: базова інформація про книги для каталогу
+-- Purpose: базовий каталог книг без зв’язків
 -- ================================================================
 CREATE OR REPLACE VIEW book_metadata AS
 SELECT
@@ -55,7 +54,7 @@ FROM books;
 
 -- ================================================================
 -- VERTICAL VIEW: best_reviews
--- Purpose: тільки найвищі оцінки (5★)
+-- Purpose: тільки 5★ відгуки
 -- ================================================================
 CREATE OR REPLACE VIEW best_reviews AS
 SELECT
@@ -70,7 +69,7 @@ WHERE rating = 5;
 
 -- ================================================================
 -- MIXED VIEW: available_copies
--- Purpose: тільки доступні копії книг
+-- Purpose: доступні копії книг
 -- ================================================================
 CREATE OR REPLACE VIEW available_copies AS
 SELECT
@@ -83,56 +82,76 @@ WHERE copy_status = 'available';
 
 -- ================================================================
 -- JOIN VIEW: member_review
--- Purpose: відгуки + користувачі + книги
+-- Purpose:
+-- Швидкий доступ до повної інформації про відгук
+-- (користувач + книга + відгук)
+-- NOTE: це основний operational view
 -- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
+    r.review_id,
     m.member_id,
     m.first_name,
     m.last_name,
     b.book_id,
     b.title,
     r.rating,
-    r.review_text
+    r.review_text,
+    r.created_at
 FROM reviews r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id;
 
 
 -- ================================================================
--- SUBQUERY VIEW (CORRELATED SUBQUERY REQUIREMENT)
+-- SUBQUERY VIEW (CORRELATED SUBQUERY — justified use case)
+-- Purpose:
+-- Демонстрація використання correlated subquery для аналітики
+-- Тут subquery рахує середній рейтинг книги (аналітична метрика)
 -- ================================================================
-CREATE OR REPLACE VIEW member_review_sub AS
+CREATE OR REPLACE VIEW review_with_book_avg AS
 SELECT
     r.review_id,
     r.member_id,
-    (SELECT m.first_name
-     FROM members m
-     WHERE m.member_id = r.member_id) AS first_name,
     r.book_id,
     r.rating,
-    r.review_text
+    r.review_text,
+    (
+        SELECT AVG(r2.rating)
+        FROM reviews r2
+        WHERE r2.book_id = r.book_id
+    ) AS book_avg_rating
 FROM reviews r;
 
 
 -- ================================================================
 -- VIEW BASED ON ANOTHER VIEW
+-- Purpose:
+-- Побудова складного представлення через layering views
 -- ================================================================
 CREATE OR REPLACE VIEW member_review_details AS
 SELECT
-    b.title,
+    s.review_id,
     s.member_id,
     s.first_name,
+    s.book_id,
+    b.title,
     s.rating,
     s.review_text
-FROM member_review_sub s
+FROM member_review s
 JOIN books b ON b.book_id = s.book_id;
 
 
 -- ================================================================
 -- UNION VIEW: library_activity
--- Purpose: активність бібліотеки (видачі + резервації)
--- NOTE: UNION ALL використовується, щоб не втрачати події
+-- Purpose:
+-- Об’єднана історія активності бібліотеки
+-- (видачі + резервації)
+--
+-- WHY UNION ALL:
+-- - borrowings і reservations — різні сутності
+-- - дублікати між таблицями не є логічними дублями
+-- - UNION ALL швидший (без deduplication)
 -- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
 
@@ -163,8 +182,14 @@ WHERE r.reservation_status IN ('pending', 'assigned', 'fulfilled');
 
 
 -- ================================================================
--- CHECK OPTION VIEW: high_rated_reviews
--- Purpose: дозволяє змінювати тільки high-rated reviews
+-- CHECK OPTION VIEW
+-- Purpose:
+-- Дозволяє тільки високорейтингові відгуки (>=4)
+-- Бізнес-логіка: moderation layer для quality control
+--
+-- IMPORTANT:
+-- WITH CHECK OPTION гарантує, що UPDATE/INSERT
+-- не зможе створити запис, який “випаде” з view
 -- ================================================================
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
@@ -181,27 +206,9 @@ WITH CHECK OPTION;
 
 
 -- ================================================================
--- BUSINESS VIEW: overdue_borrowings
--- ================================================================
-CREATE OR REPLACE VIEW overdue_borrowings AS
-SELECT
-    br.borrowing_id,
-    m.first_name,
-    m.last_name,
-    b.title,
-    br.due_date,
-    (CURRENT_TIMESTAMP - br.due_date) AS days_overdue
-FROM borrowings br
-JOIN members m ON m.member_id = br.member_id
-JOIN book_copies bc ON bc.copy_id = br.copy_id
-JOIN books b ON b.book_id = bc.book_id
-WHERE br.returned_at IS NULL
-  AND br.due_date < CURRENT_TIMESTAMP;
-
-
--- ================================================================
 -- BUSINESS VIEW: popular_books
--- Purpose: аналітика популярності книг
+-- Purpose:
+-- Аналітика популярності книг
 -- ================================================================
 CREATE OR REPLACE VIEW popular_books AS
 SELECT
@@ -221,7 +228,8 @@ GROUP BY b.book_id, b.title;
 
 -- ================================================================
 -- BUSINESS VIEW: reading_history_extended
--- Purpose: історія користувачів з статусами
+-- Purpose:
+-- Історія читання з активними/завершеними позиками
 -- ================================================================
 CREATE OR REPLACE VIEW reading_history_extended AS
 SELECT
@@ -246,6 +254,8 @@ JOIN books b ON b.book_id = bc.book_id;
 
 -- ================================================================
 -- BUSINESS VIEW: book_inventory_status
+-- Purpose:
+-- Повна аналітика інвентарю книг
 -- ================================================================
 CREATE OR REPLACE VIEW book_inventory_status AS
 SELECT
@@ -266,12 +276,10 @@ GROUP BY b.book_id, b.title;
 SELECT * FROM book_metadata ORDER BY book_id LIMIT 3;
 SELECT * FROM best_reviews ORDER BY rating DESC LIMIT 3;
 SELECT * FROM available_copies ORDER BY copy_id LIMIT 3;
-SELECT * FROM member_review LIMIT 3;
-SELECT * FROM member_review_sub LIMIT 3;
-SELECT * FROM member_review_details LIMIT 3;
+SELECT * FROM member_review ORDER BY review_id LIMIT 3;
+SELECT * FROM review_with_book_avg ORDER BY review_id LIMIT 3;
+SELECT * FROM member_review_details ORDER BY review_id LIMIT 3;
 SELECT * FROM library_activity ORDER BY activity_date DESC LIMIT 5;
 SELECT * FROM high_rated_reviews LIMIT 5;
-SELECT * FROM overdue_borrowings ORDER BY days_overdue DESC LIMIT 5;
+SELECT * FROM overdue_borrowings LIMIT 5;
 SELECT * FROM popular_books ORDER BY review_count DESC LIMIT 5;
-SELECT * FROM reading_history_extended LIMIT 5;
-SELECT * FROM book_inventory_status LIMIT 5;
