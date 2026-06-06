@@ -32,35 +32,19 @@
 
 -- Add your CREATE VIEW statements below this line
 
--- ================================================================
--- SQL VIEWS TEMPLATE (TOPIC 10)
--- Library Management System
--- ================================================================
-
--- ================================================================
--- HORIZONTAL VIEW
--- Purpose:
--- Displays only key member contact information.
--- Used when full member details are not required.
--- ================================================================
-CREATE OR REPLACE VIEW member_contacts AS
+-- Horizontal view: базова інформація про книги (без зв’язків і агрегатів)
+CREATE OR REPLACE VIEW book_metadata AS
 SELECT
-    member_id,
-    first_name,
-    last_name,
-    email
-FROM members;
+    book_id,
+    title,
+    isbn,
+    publication_year
+FROM books;
 
-SELECT * FROM member_contacts;
+SELECT * FROM book_metadata;
 
-
--- ================================================================
--- VERTICAL VIEW
--- Purpose:
--- Shows only reviews with the highest rating.
--- Used for displaying featured reviews.
--- ================================================================
-CREATE OR REPLACE VIEW best_reviews_only AS
+-- Vertical view: тільки відгуки з найвищим рейтингом (5 зірок)
+CREATE OR REPLACE VIEW best_reviews AS
 SELECT
     review_id,
     member_id,
@@ -70,72 +54,36 @@ SELECT
 FROM reviews
 WHERE rating = 5;
 
-SELECT * FROM best_reviews_only;
+SELECT * FROM best_reviews;
 
-
--- ================================================================
--- MIXED VIEW
--- Purpose:
--- Combines column selection and row filtering.
--- Displays only active members with essential information.
--- ================================================================
-CREATE OR REPLACE VIEW active_members AS
+-- Mixed view: доступні копії книг (фільтрація + вибір колонок)
+CREATE OR REPLACE VIEW available_copies AS
 SELECT
-    member_id,
-    first_name,
-    last_name,
-    email
-FROM members
-WHERE membership_status = 'ACTIVE';
+    copy_id,
+    book_id,
+    copy_number
+FROM book_copies
+WHERE copy_status = 'available';
 
-SELECT * FROM active_members;
+SELECT * FROM available_copies;
 
-
--- ================================================================
--- JOIN VIEW
--- Purpose:
--- Shows member reviews together with member information.
--- Demonstrates a view based on multiple tables.
--- ================================================================
+-- Join view: відгуки разом з даними про користувача та книгу
 CREATE OR REPLACE VIEW member_review AS
 SELECT
     m.member_id,
     m.first_name,
-    r.book_id,
+    m.last_name,
+    b.book_id,
+    b.title,
     r.rating,
     r.review_text
 FROM reviews r
-JOIN members m
-    ON m.member_id = r.member_id;
+JOIN members m ON m.member_id = r.member_id
+JOIN books b ON b.book_id = r.book_id;
 
 SELECT * FROM member_review;
 
-
--- ================================================================
--- AGGREGATE / INVENTORY VIEW
--- Purpose:
--- Displays the number of available copies for each book.
--- Supports inventory monitoring.
--- ================================================================
-CREATE OR REPLACE VIEW book_inventory AS
-SELECT
-    b.book_id,
-    b.title,
-    COUNT(bc.copy_id) AS copy_count
-FROM books b
-LEFT JOIN book_copies bc
-    ON bc.book_id = b.book_id
-GROUP BY b.book_id, b.title;
-
-SELECT * FROM book_inventory;
-
-
--- ================================================================
--- SUBQUERY VIEW
--- Purpose:
--- Demonstrates the use of a subquery inside a view.
--- Retrieves reviewer names through a correlated subquery.
--- ================================================================
+-- Subquery view: отримання імені читача через підзапит
 CREATE OR REPLACE VIEW member_review_sub AS
 SELECT
     (
@@ -150,66 +98,57 @@ FROM reviews r;
 
 SELECT * FROM member_review_sub;
 
-
--- ================================================================
--- VIEW BASED ON ANOTHER VIEW
--- Purpose:
--- Extends member_review_sub with book titles.
--- Demonstrates layered view architecture.
--- ================================================================
-CREATE OR REPLACE VIEW member_review_sub_book AS
+-- View based on another view: розширення subquery view додаванням назви книги
+CREATE OR REPLACE VIEW member_review_details AS
 SELECT
     b.title,
-    r.first_name,
-    r.rating,
-    r.review_text
-FROM member_review_sub r
-LEFT JOIN books b
-    ON b.book_id = r.book_id;
+    s.first_name,
+    s.rating,
+    s.review_text
+FROM member_review_sub s
+JOIN books b ON b.book_id = s.book_id;
 
-SELECT * FROM member_review_sub_book;
+SELECT * FROM member_review_details;
 
-
--- ================================================================
--- UNION VIEW
--- Purpose:
--- Combines review information from two sources.
--- Demonstrates UNION operation in views.
--- ================================================================
-CREATE OR REPLACE VIEW review_union AS
+-- UNION view: об’єднання активних видач та резервацій у єдиний список активностей
+CREATE OR REPLACE VIEW library_activity AS
 SELECT
-    first_name,
-    CAST(book_id AS TEXT) AS book_info,
-    rating,
-    review_text
-FROM member_review_sub
+    m.member_id,
+    CONCAT(m.first_name, ' ', m.last_name) AS member_name,
+    b.title,
+    'BORROWING' AS activity_type,
+    br.borrowed_at AS activity_date
+FROM borrowings br
+JOIN members m ON m.member_id = br.member_id
+JOIN book_copies bc ON bc.copy_id = br.copy_id
+JOIN books b ON b.book_id = bc.book_id
+WHERE br.returned_at IS NULL
 
 UNION
 
 SELECT
-    first_name,
-    title AS book_info,
-    rating,
-    review_text
-FROM member_review_sub_book;
+    m.member_id,
+    CONCAT(m.first_name, ' ', m.last_name) AS member_name,
+    b.title,
+    'RESERVATION' AS activity_type,
+    r.reservation_date AS activity_date
+FROM reservations r
+JOIN members m ON m.member_id = r.member_id
+JOIN books b ON b.book_id = r.book_id
+WHERE r.reservation_status = 'pending';
 
-SELECT * FROM review_union;
+SELECT * FROM library_activity;
 
-
--- ================================================================
--- UPDATABLE VIEW WITH CHECK OPTION
--- Purpose:
--- Allows updates only for reviews with rating >= 4.
--- CHECK OPTION prevents modifications that would
--- violate the view condition.
--- ================================================================
+-- Updatable view with CHECK OPTION: дозволяє редагування тільки для відгуків з рейтингом >= 4
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
     review_id,
     member_id,
     book_id,
     rating,
-    review_text
+    review_text,
+    created_at,
+    updated_at
 FROM reviews
 WHERE rating >= 4
 WITH CHECK OPTION;
