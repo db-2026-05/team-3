@@ -32,7 +32,18 @@
 
 -- Add your CREATE VIEW statements below this line
 
--- Horizontal view: базова інформація про книги (без зв’язків і агрегатів)
+-- ================================================================
+-- SQL VIEWS (TOPIC 10)
+-- Library Management System
+-- Schema: see ddl.sql (PostgreSQL)
+-- ================================================================
+
+
+-- ================================================================
+-- HORIZONTAL VIEW
+-- PURPOSE: Базова інформація про книги без зв'язків
+-- USE CASE: Каталог книг у бібліотеці
+-- ================================================================
 CREATE OR REPLACE VIEW book_metadata AS
 SELECT
     book_id,
@@ -41,9 +52,12 @@ SELECT
     publication_year
 FROM books;
 
-SELECT * FROM book_metadata;
 
--- Vertical view: тільки відгуки з найвищим рейтингом (5 зірок)
+-- ================================================================
+-- VERTICAL VIEW
+-- PURPOSE: Відображення тільки найкращих відгуків (5 зірок)
+-- USE CASE: Рекомендовані відгуки
+-- ================================================================
 CREATE OR REPLACE VIEW best_reviews AS
 SELECT
     review_id,
@@ -54,9 +68,12 @@ SELECT
 FROM reviews
 WHERE rating = 5;
 
-SELECT * FROM best_reviews;
 
--- Mixed view: доступні копії книг (фільтрація + вибір колонок)
+-- ================================================================
+-- MIXED VIEW
+-- PURPOSE: Доступні копії книг
+-- USE CASE: Перевірка наявності книг для видачі
+-- ================================================================
 CREATE OR REPLACE VIEW available_copies AS
 SELECT
     copy_id,
@@ -65,9 +82,12 @@ SELECT
 FROM book_copies
 WHERE copy_status = 'available';
 
-SELECT * FROM available_copies;
 
--- Join view: відгуки разом з даними про користувача та книгу
+-- ================================================================
+-- JOIN VIEW
+-- PURPOSE: Відгуки разом з користувачами та книгами
+-- USE CASE: Панель адміністратора / UI відгуків
+-- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
     m.member_id,
@@ -81,11 +101,15 @@ FROM reviews r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id;
 
-SELECT * FROM member_review;
 
--- Subquery view: отримання імені читача через підзапит
+-- ================================================================
+-- SUBQUERY VIEW
+-- PURPOSE: Отримання даних через correlated subquery
+-- IMPORTANT: містить member_id для подальших join
+-- ================================================================
 CREATE OR REPLACE VIEW member_review_sub AS
 SELECT
+    r.member_id,
     (
         SELECT m.first_name
         FROM members m
@@ -96,22 +120,29 @@ SELECT
     r.review_text
 FROM reviews r;
 
-SELECT * FROM member_review_sub;
 
--- View based on another view: розширення subquery view додаванням назви книги
+-- ================================================================
+-- VIEW BASED ON ANOTHER VIEW
+-- PURPOSE: Розширення subquery view з назвами книг
+-- ================================================================
 CREATE OR REPLACE VIEW member_review_details AS
 SELECT
     b.title,
+    s.member_id,
     s.first_name,
     s.rating,
     s.review_text
 FROM member_review_sub s
 JOIN books b ON b.book_id = s.book_id;
 
-SELECT * FROM member_review_details;
 
--- UNION view: об’єднання активних видач та резервацій у єдиний список активностей
+-- ================================================================
+-- UNION VIEW
+-- PURPOSE: Об'єднання активних borrowings і reservations
+-- NOTE: всі колонки синхронізовані за назвою і типом
+-- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
+
 SELECT
     m.member_id,
     CONCAT(m.first_name, ' ', m.last_name) AS member_name,
@@ -137,9 +168,13 @@ JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id
 WHERE r.reservation_status = 'pending';
 
-SELECT * FROM library_activity;
 
--- Updatable view with CHECK OPTION: дозволяє редагування тільки для відгуків з рейтингом >= 4
+-- ================================================================
+-- UPDATABLE VIEW WITH CHECK OPTION
+-- PURPOSE: Дозволяє змінювати тільки високорейтингові відгуки
+-- NOTE: INSERT/UPDATE з rating < 4 буде відхилено
+-- NULL rating також відхиляється (UNKNOWN в CHECK OPTION)
+-- ================================================================
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
     review_id,
@@ -152,5 +187,3 @@ SELECT
 FROM reviews
 WHERE rating >= 4
 WITH CHECK OPTION;
-
-SELECT * FROM high_rated_reviews;
