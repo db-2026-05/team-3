@@ -40,8 +40,18 @@
 
 
 -- ================================================================
--- HORIZONTAL VIEW
--- Purpose: повний каталог книг (без фільтрації рядків)
+-- HORIZONTAL VIEW: book_catalog
+-- ================================================================
+-- Author: [ім'я учасника]
+-- Purpose: Забезпечити сокращену версію каталогу книг
+--          (без фізичних копій та відгуків) для публічного перегляду.
+--
+-- Business Context:
+--   - Відвідувачі хочуть бачити загальний список книг без деталей про копії
+--   - Каталог сортується за назвою для зручності пошуку
+--
+-- Related Tables: books, categories
+-- Supports: Book discovery, catalog browsing
 -- ================================================================
 CREATE OR REPLACE VIEW book_catalog AS
 SELECT
@@ -129,6 +139,26 @@ FROM member_review;
 -- ================================================================
 -- UNION VIEW: library_activity
 -- ================================================================
+-- Author: [ім'я]
+-- Purpose: Об'єднати всі активні дії члена бібліотеки
+--          (видачу книг та резервацію).
+--
+-- Business Context:
+--   - Члени можуть переглядати свою активність в одному місці
+--   - Дозволяє отримати хронологію всіх операцій
+--
+-- Structure (both SELECT must have identical columns):
+--   1. member_id (bigint)
+--   2. member_name (text)
+--   3. title (text)
+--   4. activity_type (text: 'BORROWING' or 'RESERVATION')
+--   5. activity_date (timestamp)
+--   6. status (text)
+--
+-- Active Filter:
+--   - BORROWING: only returned_at IS NULL
+--   - RESERVATION: only status IN ('pending', 'assigned')
+-- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
 SELECT
     m.member_id,
@@ -159,8 +189,19 @@ WHERE r.reservation_status IN ('pending', 'assigned');
 
 
 -- ================================================================
--- CHECK OPTION VIEW
--- quality control layer для модерації відгуків
+-- UPDATABLE VIEW WITH CHECK OPTION: high_rated_reviews
+-- ================================================================
+-- Author: [ім'я]
+-- Purpose: Забезпечити шар, через який можна редагувати тільки
+--          позитивні відгуки (rating >= 4).
+--          Запобігає помилковому зниженню рейтингу через цей view.
+--
+-- Business Logic:
+--   - Адміністратори можуть оновлювати high_rated_reviews без ризику
+--     випадково зробити рейтинг < 4
+--
+-- Constraints: rating >= 4 (CHECK OPTION)
+-- Updatable: YES (INSERT, UPDATE, DELETE)
 -- ================================================================
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
