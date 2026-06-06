@@ -256,6 +256,9 @@ SET copy_id = 11,
 WHERE reservation_id = 5;
 
 -- (b) Mark a physical copy as lost (inventory maintenance).
+--     Copy 3 (book 1 "1984") had no active borrowing, so it was 'available';
+--     a stock-take found it missing, so it transitions available -> lost.
+--     'lost' is a terminal physical state and is independent of borrowings.
 UPDATE book_copies
 SET copy_status = 'lost',
     updated_at = CURRENT_TIMESTAMP
