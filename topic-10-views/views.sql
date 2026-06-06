@@ -33,17 +33,20 @@
 -- Add your CREATE VIEW statements below this line
 
 -- ================================================================
+
 -- SQL VIEWS (TOPIC 10)
 -- Library Management System
--- Schema reference: ddl.sql
--- ================================================================
+-- Schema: ddl.sql (MUST BE EXECUTED FIRST)
 
+-- ================================================================
+-- NOTE:
+-- This file depends on existing schema:
+-- members, books, borrowings, book_copies, reviews, reservations
 
 -- ================================================================
 -- HORIZONTAL VIEW: book_metadata
--- Purpose: мінімальна інформація про книгу для каталогу
--- Related tables: books
 -- ================================================================
+
 CREATE OR REPLACE VIEW book_metadata AS
 SELECT
     book_id,
@@ -52,12 +55,10 @@ SELECT
     publication_year
 FROM books;
 
-
 -- ================================================================
 -- VERTICAL VIEW: best_reviews
--- Purpose: тільки високі оцінки (5★)
--- Related tables: reviews
 -- ================================================================
+
 CREATE OR REPLACE VIEW best_reviews AS
 SELECT
     review_id,
@@ -68,12 +69,10 @@ SELECT
 FROM reviews
 WHERE rating = 5;
 
-
 -- ================================================================
 -- MIXED VIEW: available_copies
--- Purpose: доступні фізичні копії книг
--- Related tables: book_copies
 -- ================================================================
+
 CREATE OR REPLACE VIEW available_copies AS
 SELECT
     copy_id,
@@ -82,11 +81,10 @@ SELECT
 FROM book_copies
 WHERE copy_status = 'available';
 
-
 -- ================================================================
 -- JOIN VIEW: member_review
--- Purpose: відгуки + користувач + книга
 -- ================================================================
+
 CREATE OR REPLACE VIEW member_review AS
 SELECT
     m.member_id,
@@ -100,11 +98,10 @@ FROM reviews r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id;
 
+-- ================================================================
+-- SUBQUERY VIEW (REQUIRED CORRELATED SUBQUERY)
+-- ================================================================
 
--- ================================================================
--- SUBQUERY VIEW (TRUE SUBQUERY REQUIREMENT)
--- IMPORTANT: реалізовано через correlated subquery
--- ================================================================
 CREATE OR REPLACE VIEW member_review_sub AS
 SELECT
     r.review_id,
@@ -117,10 +114,10 @@ SELECT
     r.review_text
 FROM reviews r;
 
-
 -- ================================================================
 -- VIEW BASED ON ANOTHER VIEW
 -- ================================================================
+
 CREATE OR REPLACE VIEW member_review_details AS
 SELECT
     b.title,
@@ -131,13 +128,12 @@ SELECT
 FROM member_review_sub s
 JOIN books b ON b.book_id = s.book_id;
 
+-- ================================================================
+-- UNION VIEW (FIXED BUSINESS LOGIC)
+-- NOTE: reservations MAY have NULL copy_id → no join to book_copies
+-- ================================================================
 
--- ================================================================
--- UNION VIEW (FIXED LOGIC)
--- NOTE: обидві частини тепер описують "активні дії"
--- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
-
 SELECT
     m.member_id,
     CONCAT(m.first_name, ' ', m.last_name) AS member_name,
@@ -161,14 +157,12 @@ SELECT
 FROM reservations r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id
-WHERE r.reservation_status IN ('pending', 'assigned');
-
+WHERE r.reservation_status IN ('pending', 'assigned', 'fulfilled');
 
 -- ================================================================
--- UPDATABLE VIEW WITH CHECK OPTION (CORRECT LOGIC)
--- NOTE: CHECK OPTION гарантує видимість рядка після UPDATE/INSERT
--- NULL rating не проходить WHERE (FALSE/UNKNOWN → виключається)
+-- CHECK OPTION VIEW
 -- ================================================================
+
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
     review_id,
@@ -180,13 +174,12 @@ SELECT
     updated_at
 FROM reviews
 WHERE rating >= 4
-AND rating IS NOT NULL
 WITH CHECK OPTION;
-
 
 -- ================================================================
 -- BUSINESS VIEW: overdue borrowings
 -- ================================================================
+
 CREATE OR REPLACE VIEW overdue_borrowings AS
 SELECT
     br.borrowing_id,
@@ -202,10 +195,10 @@ JOIN books b ON b.book_id = bc.book_id
 WHERE br.returned_at IS NULL
   AND br.due_date < CURRENT_TIMESTAMP;
 
+-- ================================================================
+-- BUSINESS VIEW: popular books
+-- ================================================================
 
--- ================================================================
--- BUSINESS VIEW: popular_books
--- ================================================================
 CREATE OR REPLACE VIEW popular_books AS
 SELECT
     b.book_id,
@@ -216,9 +209,42 @@ FROM books b
 LEFT JOIN reviews r ON r.book_id = b.book_id
 GROUP BY b.book_id, b.title;
 
+-- ================================================================
+-- BUSINESS VIEW: reading history (FIXED MISSING REQUIREMENT)
+-- ================================================================
+
+CREATE OR REPLACE VIEW reading_history AS
+SELECT
+    m.member_id,
+    CONCAT(m.first_name, ' ', m.last_name) AS member_name,
+    b.title,
+    br.borrowed_at,
+    br.returned_at,
+    EXTRACT(DAY FROM br.returned_at - br.borrowed_at) AS days_borrowed
+FROM borrowings br
+JOIN members m ON m.member_id = br.member_id
+JOIN book_copies bc ON bc.copy_id = br.copy_id
+JOIN books b ON b.book_id = bc.book_id
+WHERE br.returned_at IS NOT NULL;
 
 -- ================================================================
--- DEMO SELECTS
+-- BUSINESS VIEW: book inventory status (FIXED REQUIREMENT)
+-- ================================================================
+
+CREATE OR REPLACE VIEW book_inventory_status AS
+SELECT
+    b.book_id,
+    b.title,
+    COUNT(bc.copy_id) AS total_copies,
+    SUM(CASE WHEN bc.copy_status = 'available' THEN 1 ELSE 0 END) AS available_count,
+    SUM(CASE WHEN bc.copy_status = 'borrowed' THEN 1 ELSE 0 END) AS borrowed_count,
+    SUM(CASE WHEN bc.copy_status = 'unavailable' THEN 1 ELSE 0 END) AS unavailable_count
+FROM books b
+LEFT JOIN book_copies bc ON bc.book_id = b.book_id
+GROUP BY b.book_id, b.title;
+
+-- ================================================================
+-- DEMO QUERIES (REQUIRED BY REVIEW)
 -- ================================================================
 
 SELECT * FROM book_metadata LIMIT 3;
@@ -226,7 +252,10 @@ SELECT * FROM best_reviews LIMIT 3;
 SELECT * FROM available_copies LIMIT 3;
 SELECT * FROM member_review LIMIT 3;
 SELECT * FROM member_review_sub LIMIT 3;
+SELECT * FROM member_review_details LIMIT 3;
 SELECT * FROM library_activity LIMIT 3;
 SELECT * FROM high_rated_reviews LIMIT 3;
 SELECT * FROM overdue_borrowings LIMIT 3;
+SELECT * FROM reading_history LIMIT 3;
+SELECT * FROM book_inventory_status LIMIT 3;
 SELECT * FROM popular_books LIMIT 3;
