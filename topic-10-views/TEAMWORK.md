@@ -7,8 +7,8 @@
 
 | Учасник | Роль у команді | Що зроблено | Артефакти / файли |
 |---|---|---|---|
-| Novikov Volodymyr | Database Architect / Core Data Layer | Розробка базової логіки views: book_catalog, popular_books, member_review, member_review_details, high_rated_reviews, загальна архітектура views та узгодження структури | `views.sql` (horizontal, vertical, mixed, analytics, check option views) |
-| Vitaliy Zhyryk | Inventory & Reviews Specialist | Робота з таблицями book_copies та reviews, реалізація available_copies, recent_reviews, участь у побудові аналітичних views (popular_books) | `views.sql` (inventory + review-related views) |
+| Novikov Volodymyr | Database Architect / Core Data Layer | Розробка базової логіки views: book_catalog загальна архітектура views та узгодження структури | `views.sql` (horizontal, vertical, mixed, analytics, check option views) |
+| Vitaliy Zhyryk | Inventory & Reviews Specialist | Робота з таблицями book_copies та reviews, реалізація available_copies, member_review, member_review_details, high_rated_reviews, recent_reviews, popular_books) | `views.sql` (inventory + review-related views) |
 | Volodymyr Fedorkiv | Borrowing & Reservation Logic Engineer | Реалізація borrowings, reservations, library_activity (UNION ALL), reading_history_extended, overdue_borrowings, members_with_book_count | `views.sql` (borrowing, reservation, subquery, UNION views) |
 
 ---
