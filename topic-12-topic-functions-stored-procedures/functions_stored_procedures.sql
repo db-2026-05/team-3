@@ -44,14 +44,14 @@
 
 -- =====================================================================
 -- PROGRAMMABILITY SCRIPT FOR ALL TEAM MEMBERS
--- Domains: 
+-- Domains:
 -- Person 1: books, categories, authors, book_authors
 -- Person 2: book_copies, reviews
 -- Person 3: members, borrowings, reservations
 -- =====================================================================
 
 -- =====================================================================
--- PERSON 1: CATALOG MANAGEMENT 
+-- PERSON 1: CATALOG MANAGEMENT
 -- Tables: books, categories, authors, book_authors
 -- =====================================================================
 
@@ -74,7 +74,7 @@ BEGIN
     FROM authors a
     JOIN book_authors ba ON a.author_id = ba.author_id
     WHERE ba.book_id = p_book_id;
-    
+
     RETURN COALESCE(v_author_names, 'No Authors Found');
 END;
 $$;
@@ -92,7 +92,7 @@ BEGIN
     SELECT COUNT(*) INTO v_count
     FROM books
     WHERE category_id = p_category_id;
-    
+
     RETURN v_count;
 END;
 $$;
@@ -155,10 +155,10 @@ BEGIN
     INSERT INTO books (title, isbn, publication_year, category_id)
     VALUES (p_title, p_isbn, p_pub_year, p_category_id)
     RETURNING book_id INTO v_new_book_id;
-    
+
     INSERT INTO book_authors (book_id, author_id)
     VALUES (v_new_book_id, p_author_id);
-    
+
 EXCEPTION
     WHEN unique_violation THEN
         RAISE EXCEPTION 'Operation failed: ISBN % already exists.', p_isbn;
@@ -181,7 +181,7 @@ BEGIN
     UPDATE books
     SET category_id = p_new_category_id
     WHERE book_id = p_book_id;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Book with ID % not found.', p_book_id;
     END IF;
@@ -202,7 +202,7 @@ BEGIN
     SET first_name = p_new_first,
         last_name = p_new_last
     WHERE author_id = p_author_id;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Author with ID % not found.', p_author_id;
     END IF;
@@ -211,7 +211,7 @@ $$;
 
 
 -- =====================================================================
--- PERSON 2: INVENTORY & FEEDBACK 
+-- PERSON 2: INVENTORY & FEEDBACK
 -- Tables: book_copies, reviews
 -- =====================================================================
 
@@ -333,7 +333,7 @@ BEGIN
     SET copy_status = p_new_status,
         updated_at = CURRENT_TIMESTAMP
     WHERE copy_id = p_copy_id;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Copy ID % not found.', p_copy_id;
     END IF;
@@ -355,7 +355,7 @@ BEGIN
         review_text = p_new_text,
         updated_at = CURRENT_TIMESTAMP
     WHERE review_id = p_review_id;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Review ID % not found.', p_review_id;
     END IF;
@@ -384,8 +384,8 @@ DECLARE
 BEGIN
     SELECT EXISTS (
         SELECT 1 FROM borrowings
-        WHERE member_id = p_member_id 
-          AND returned_at IS NULL 
+        WHERE member_id = p_member_id
+          AND returned_at IS NULL
           AND due_date < CURRENT_DATE
     ) INTO v_has_overdue;
     RETURN v_has_overdue;
@@ -404,7 +404,7 @@ BEGIN
     SELECT queue_position INTO v_position
     FROM reservations
     WHERE reservation_id = p_reservation_id;
-    
+
     RETURN COALESCE(v_position, 0);
 END;
 $$;
@@ -421,7 +421,7 @@ BEGIN
     SELECT COUNT(*) INTO v_active_count
     FROM borrowings
     WHERE member_id = p_member_id AND returned_at IS NULL;
-    
+
     RETURN v_active_count;
 END;
 $$;
@@ -461,16 +461,27 @@ CREATE OR REPLACE PROCEDURE sp_checkout_book(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- Business logic: check if copy is actually available
-    IF NOT EXISTS (SELECT 1 FROM book_copies WHERE copy_id = p_copy_id AND copy_status = 'available') THEN
+    -- Валідація
+    IF NOT EXISTS (SELECT 1 FROM members WHERE member_id = p_member_id) THEN
+        RAISE EXCEPTION 'Member ID % not found.', p_member_id;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM book_copies
+                   WHERE copy_id = p_copy_id
+                   AND copy_status = 'available') THEN
         RAISE EXCEPTION 'Copy ID % is not available for checkout.', p_copy_id;
     END IF;
 
-    INSERT INTO borrowings (member_id, copy_id, due_date)
-    VALUES (p_member_id, p_copy_id, p_due_date);
-    
-    -- Transactional update of the copy status
-    UPDATE book_copies SET copy_status = 'borrowed' WHERE copy_id = p_copy_id;
+    -- Трансакційно
+    BEGIN
+        INSERT INTO borrowings (member_id, copy_id, borrowed_at, due_date)
+        VALUES (p_member_id, p_copy_id, CURRENT_TIMESTAMP, p_due_date);
+
+        UPDATE book_copies SET copy_status = 'borrowed' WHERE copy_id = p_copy_id;
+    EXCEPTION
+        WHEN OTHERS THEN
+            RAISE EXCEPTION 'Checkout failed: %', SQLERRM;
+    END;
 END;
 $$;
 
@@ -493,11 +504,11 @@ BEGIN
     SET returned_at = CURRENT_TIMESTAMP
     WHERE borrowing_id = p_borrowing_id AND returned_at IS NULL
     RETURNING copy_id INTO v_copy_id;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Active borrowing % not found.', p_borrowing_id;
     END IF;
-    
+
     -- Make the copy available again
     UPDATE book_copies SET copy_status = 'available' WHERE copy_id = v_copy_id;
 END;
@@ -515,7 +526,7 @@ BEGIN
     SET reservation_status = 'cancelled',
         queue_position = NULL
     WHERE reservation_id = p_reservation_id AND reservation_status = 'pending';
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Pending reservation % not found.', p_reservation_id;
     END IF;
@@ -523,35 +534,33 @@ END;
 $$;
 
 -- =====================================================================
--- TEST CALLS (Execution Block for verification)
+-- TEST DATA SETUP (Optional, for verification)
 -- =====================================================================
 
-/*
+-- Додайте реальні дані до таблиць для тестування функцій
+INSERT INTO categories (category_name) VALUES ('Fiction'), ('Non-Fiction');
+INSERT INTO authors (first_name, last_name) VALUES ('John', 'Doe'), ('Jane', 'Smith');
+INSERT INTO books (title, isbn, publication_year, category_id)
+    VALUES ('Test Book', '9780000000001', 2020, 1);
+INSERT INTO book_authors (book_id, author_id) VALUES (1, 1);
+INSERT INTO members (first_name, last_name, email, phone)
+    VALUES ('Test', 'User', 'test@example.com', '1234567890');
+
+-- =====================================================================
+-- TEST CALLS (Activate for verification)
+-- =====================================================================
+
 -- Person 1 Tests
 SELECT fn_get_authors_for_book(1);
 SELECT fn_count_books_by_category(1);
 SELECT * FROM fn_get_books_by_author(1);
-CALL sp_add_author('Test', 'Author');
--- (Requires an existing category_id of 1)
-CALL sp_add_book_with_author('Test Book', '9780000000000', 2026, 1, 1);
-CALL sp_update_book_category(1, 2);
-CALL sp_update_author_name(1, 'Updated', 'Author');
 
 -- Person 2 Tests
 SELECT fn_count_available_copies(1);
 SELECT fn_get_avg_book_rating(1);
 SELECT fn_get_latest_review(1);
-CALL sp_add_review(1, 1, 5, 'Great book!');
-CALL sp_add_book_copy(1, CURRENT_DATE);
-CALL sp_update_copy_status(1, 'lost');
-CALL sp_update_review(1, 4, 'Good book, but lost a star.');
 
 -- Person 3 Tests
 SELECT fn_has_overdue_books(1);
 SELECT fn_get_queue_position(1);
 SELECT fn_get_active_borrowing_count(1);
-CALL sp_register_member('Test', 'Member', 'test@example.com', '1234567890');
-CALL sp_checkout_book(1, 1, CURRENT_DATE + INTERVAL '14 days');
-CALL sp_return_book(1);
-CALL sp_cancel_reservation(1);
-*/
