@@ -94,16 +94,16 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 -- ======================================================
 
 -- Allow schema usage for all functional roles
-GRANT USAGE ON SCHEMA public TO 
-    catalog_manager, catalog_viewer, 
-    member_admin, member_support, 
+GRANT USAGE ON SCHEMA public TO
+    catalog_manager, catalog_viewer,
+    member_admin, member_support,
     circulation_staff, audit_viewer;
 
 -- -------------------------
 -- Domain: Catalog
 -- -------------------------
-GRANT SELECT, INSERT, UPDATE, DELETE ON books, authors, book_authors TO catalog_manager;
-GRANT USAGE, SELECT ON books_book_id_seq, authors_author_id_seq TO catalog_manager;
+GRANT SELECT, INSERT, UPDATE, DELETE ON books, authors, book_authors, book_copies, categories TO catalog_manager;
+GRANT USAGE, SELECT ON books_book_id_seq, authors_author_id_seq, categories_category_id_seq, book_copies_copy_id_seq TO catalog_manager;
 
 GRANT SELECT ON books, authors, book_authors TO catalog_viewer;
 
@@ -118,7 +118,8 @@ GRANT SELECT ON members, reviews TO member_support;
 -- -------------------------
 -- Domain: Circulation & Audit
 -- -------------------------
-GRANT SELECT, INSERT, UPDATE, DELETE ON borrowings, book_copies, reservations TO circulation_staff;
+GRANT SELECT, INSERT, UPDATE, DELETE ON borrowings, reservations TO circulation_staff;
+GRANT SELECT ON book_copies TO circulation_staff;
 GRANT USAGE, SELECT ON borrowings_borrowing_id_seq, book_copies_copy_id_seq, reservations_reservation_id_seq TO circulation_staff;
 -- Staff must be able to verify member and book details to process transactions
 GRANT SELECT ON members, books TO circulation_staff; 
@@ -133,9 +134,9 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO audit_viewer;
 -- This ensures records are properly archived (e.g., status changes) 
 -- instead of permanently erased, maintaining database integrity.
 
-REVOKE DELETE ON books FROM catalog_manager;       
-REVOKE DELETE ON members FROM member_admin;        
-REVOKE DELETE ON borrowings FROM circulation_staff; 
+REVOKE DELETE ON books FROM catalog_manager;
+REVOKE DELETE ON members FROM member_admin;
+REVOKE DELETE ON borrowings FROM circulation_staff;
 
 -- ======================================================
 -- 5. CREATE USERS
