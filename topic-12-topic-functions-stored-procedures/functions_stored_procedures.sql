@@ -460,8 +460,14 @@ CREATE OR REPLACE PROCEDURE sp_checkout_book(
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_borrowing_id BIGINT;
 BEGIN
-    -- Валідація
+    -- Validation
+    IF p_due_date <= CURRENT_DATE THEN
+        RAISE EXCEPTION 'Due date must be in the future.';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM members WHERE member_id = p_member_id) THEN
         RAISE EXCEPTION 'Member ID % not found.', p_member_id;
     END IF;
@@ -472,13 +478,19 @@ BEGIN
         RAISE EXCEPTION 'Copy ID % is not available for checkout.', p_copy_id;
     END IF;
 
-    -- Трансакційно
+    -- Transactional block with proper error handling
     BEGIN
         INSERT INTO borrowings (member_id, copy_id, borrowed_at, due_date)
-        VALUES (p_member_id, p_copy_id, CURRENT_TIMESTAMP, p_due_date);
+        VALUES (p_member_id, p_copy_id, CURRENT_TIMESTAMP, p_due_date)
+        RETURNING borrowing_id INTO v_borrowing_id;
 
-        UPDATE book_copies SET copy_status = 'borrowed' WHERE copy_id = p_copy_id;
+        UPDATE book_copies
+        SET copy_status = 'borrowed', updated_at = CURRENT_TIMESTAMP
+        WHERE copy_id = p_copy_id;
+
     EXCEPTION
+        WHEN foreign_key_violation THEN
+            RAISE EXCEPTION 'Foreign key constraint violation during checkout.';
         WHEN OTHERS THEN
             RAISE EXCEPTION 'Checkout failed: %', SQLERRM;
     END;
@@ -534,10 +546,12 @@ END;
 $$;
 
 -- =====================================================================
--- TEST DATA SETUP (Optional, for verification)
+-- TEST DATA SETUP (Active only if schema already created)
 -- =====================================================================
-
--- Додайте реальні дані до таблиць для тестування функцій
+-- NOTE: These INSERTs require that all tables from topic-04 are already
+-- created in the database. Run topic-04 DDL script FIRST.
+-- Uncomment the INSERT statements below after schema is ready.
+-- =====================================================================
 INSERT INTO categories (category_name) VALUES ('Fiction'), ('Non-Fiction');
 INSERT INTO authors (first_name, last_name) VALUES ('John', 'Doe'), ('Jane', 'Smith');
 INSERT INTO books (title, isbn, publication_year, category_id)
@@ -545,6 +559,13 @@ INSERT INTO books (title, isbn, publication_year, category_id)
 INSERT INTO book_authors (book_id, author_id) VALUES (1, 1);
 INSERT INTO members (first_name, last_name, email, phone)
     VALUES ('Test', 'User', 'test@example.com', '1234567890');
+
+INSERT INTO borrowings (member_id, copy_id, borrowed_at, due_date, returned_at)
+    VALUES (1, 1, CURRENT_TIMESTAMP - INTERVAL '10 days', CURRENT_DATE - INTERVAL '5 days', NULL);
+
+INSERT INTO reservations (member_id, book_id, reservation_date, reservation_status, queue_position)
+    VALUES (1, 1, CURRENT_TIMESTAMP, 'pending', 1);
+
 
 -- =====================================================================
 -- TEST CALLS (Activate for verification)
