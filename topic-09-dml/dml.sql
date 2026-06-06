@@ -43,10 +43,7 @@ DELETE FROM authors;
 DELETE FROM members;
 
 -- ================================================================
--- -- Table Book Copies
-
--- ================================================================
--- 1. REFERENCE DATA
+-- 1. REFERENCE DATA (categories, authors)
 -- ================================================================
 
 INSERT INTO categories (category_id, category_name) VALUES
@@ -131,25 +128,28 @@ INSERT INTO members (member_id, first_name, last_name, email, phone, registered_
 -- 6. BOOK COPIES
 -- ================================================================
 
+-- NOTE: copy_status is kept consistent with the active borrowings below
+-- (every copy that has a borrowing with returned_at IS NULL is 'borrowed').
+-- In later topics this synchronization is automated via triggers/procedures.
 INSERT INTO book_copies (copy_id, book_id, copy_number, copy_status) VALUES
-(1, 1, 1, 'available'),
+(1, 1, 1, 'borrowed'),
 (2, 1, 2, 'borrowed'),
 (3, 1, 3, 'available'),
 (4, 2, 1, 'available'),
-(5, 2, 2, 'available'),
+(5, 2, 2, 'borrowed'),
 (6, 3, 1, 'borrowed'),
-(7, 3, 2, 'available'),
+(7, 3, 2, 'borrowed'),
 (8, 4, 1, 'available'),
 (9, 4, 2, 'available'),
 (10, 5, 1, 'available'),
-(11, 5, 2, 'available'),
+(11, 5, 2, 'borrowed'),
 (12, 6, 1, 'available'),
 (13, 6, 2, 'available'),
 (14, 7, 1, 'borrowed'),
 (15, 7, 2, 'available'),
-(16, 8, 1, 'available'),
+(16, 8, 1, 'borrowed'),
 (17, 8, 2, 'available'),
-(18, 9, 1, 'available'),
+(18, 9, 1, 'borrowed'),
 (19, 10, 1, 'borrowed'),
 (20, 10, 2, 'available');
 
@@ -171,6 +171,29 @@ INSERT INTO borrowings (borrowing_id, member_id, copy_id, borrowed_at, due_date,
 (11, 1, 5, '2025-04-01', '2025-05-01', NULL);
 
 -- ================================================================
+-- 7b. RESERVATIONS
+--   Members queue for books whose copies are currently all borrowed.
+--     copy_id IS NULL -> still waiting in the queue (queue_position set)
+--     copy_id filled  -> a physical copy has been assigned to the member
+--   Respects partial unique index uq_reservations_pending_member_book
+--   (at most one 'pending' reservation per member per book).
+-- ================================================================
+
+INSERT INTO reservations
+    (reservation_id, member_id, book_id, copy_id, reservation_status, queue_position) VALUES
+(1,  2, 1,  NULL, 'pending',   1),
+(2,  3, 1,  NULL, 'pending',   2),
+(3,  4, 3,  NULL, 'pending',   1),
+(4,  5, 3,  NULL, 'pending',   2),
+(5,  6, 5,  NULL, 'pending',   1),
+(6,  7, 7,  NULL, 'pending',   1),
+(7,  8, 10, NULL, 'pending',   1),
+(8,  9, 4,  8,    'assigned',  NULL),
+(9,  10, 6, NULL, 'fulfilled', NULL),
+(10, 1, 8,  NULL, 'cancelled', NULL),
+(11, 2, 9,  NULL, 'pending',   1);
+
+-- ================================================================
 -- 8. REVIEWS
 -- ================================================================
 
@@ -187,51 +210,120 @@ INSERT INTO reviews (review_id, member_id, book_id, rating, review_text) VALUES
 (10, 10, 10, 4, 'Excellent mystery');
 
 -- ================================================================
+-- 8b. SYNC SEQUENCES
+--   All rows above use explicit PK values, which does NOT advance the
+--   BIGSERIAL sequences. Re-align each sequence to MAX(id) so later
+--   default-driven inserts (other topics, procedures) do not collide.
+-- ================================================================
+
+SELECT setval(pg_get_serial_sequence('categories', 'category_id'),  (SELECT MAX(category_id)  FROM categories));
+SELECT setval(pg_get_serial_sequence('authors',     'author_id'),   (SELECT MAX(author_id)    FROM authors));
+SELECT setval(pg_get_serial_sequence('books',       'book_id'),     (SELECT MAX(book_id)      FROM books));
+SELECT setval(pg_get_serial_sequence('members',     'member_id'),   (SELECT MAX(member_id)    FROM members));
+SELECT setval(pg_get_serial_sequence('book_copies', 'copy_id'),     (SELECT MAX(copy_id)      FROM book_copies));
+SELECT setval(pg_get_serial_sequence('borrowings',  'borrowing_id'),(SELECT MAX(borrowing_id) FROM borrowings));
+SELECT setval(pg_get_serial_sequence('reservations','reservation_id'),(SELECT MAX(reservation_id) FROM reservations));
+SELECT setval(pg_get_serial_sequence('reviews',     'review_id'),   (SELECT MAX(review_id)    FROM reviews));
+
+-- ================================================================
 -- 9. UPDATE SCENARIOS (WITH COMMENTS)
 -- ================================================================
 
--- Mark copy as borrowed (simulate checkout process)
-UPDATE book_copies
-SET copy_status = 'borrowed'
-WHERE copy_id = 5;
+-- (a) BOOK RETURN WORKFLOW (transactional; kept consistent by hand here,
+--     automated by triggers/procedures in later topics).
+--     Member 8 returns copy 11 (a copy of book 5 "Dune").
+UPDATE borrowings
+SET returned_at = '2025-04-18'
+WHERE borrowing_id = 8;
 
--- Update review content after rereading book
+--     The freed copy becomes available again.
+UPDATE book_copies
+SET copy_status = 'available',
+    updated_at = CURRENT_TIMESTAMP
+WHERE copy_id = 11;
+
+--     Assign the freed copy to the next member waiting for book 5.
+UPDATE reservations
+SET copy_id = 11,
+    reservation_status = 'assigned',
+    queue_position = NULL
+WHERE reservation_id = 5;
+
+-- (b) Mark a physical copy as lost (inventory maintenance).
+UPDATE book_copies
+SET copy_status = 'lost',
+    updated_at = CURRENT_TIMESTAMP
+WHERE copy_id = 3;
+
+-- (c) Update review content after rereading book.
 UPDATE reviews
 SET rating = 5,
     review_text = 'Updated: outstanding book',
     updated_at = CURRENT_TIMESTAMP
 WHERE review_id = 2;
 
--- Update member email (profile change)
+-- (d) Update member email (profile change).
 UPDATE members
 SET email = 'ivan.petrenko.updated@example.com',
     updated_at = CURRENT_TIMESTAMP
 WHERE member_id = 1;
 
 -- ================================================================
--- 10. DELETE SCENARIO (SOFT BUSINESS LOGIC)
+-- 10. DELETE SCENARIOS (WITH COMMENTS)
 -- ================================================================
 
--- Remove review (user deleted feedback)
+-- Remove a review (member deleted their feedback).
 DELETE FROM reviews
 WHERE review_id = 10;
 
+-- Remove a cancelled reservation (cleanup of an abandoned request).
+DELETE FROM reservations
+WHERE reservation_id = 10 AND reservation_status = 'cancelled';
+
 -- ================================================================
--- 11. CONSTRAINT TESTS (ISOLATED - DO NOT RUN WITH MAIN SCRIPT)
+-- 11. CONSTRAINT VALIDATION
 -- ================================================================
 
+-- (a) Active, self-contained demonstration: each invalid write is attempted
+--     and its rejection is caught, so the main script still completes while
+--     proving the constraint actually fires.
+DO $$
+BEGIN
+    -- rating must be between 1 and 5 (chk_reviews_rating)
+    BEGIN
+        INSERT INTO reviews (member_id, book_id, rating) VALUES (1, 5, 6);
+        RAISE EXCEPTION 'unexpected: chk_reviews_rating did not fire';
+    EXCEPTION WHEN check_violation THEN
+        RAISE NOTICE 'OK: rating=6 rejected by chk_reviews_rating';
+    END;
+
+    -- copy_status restricted to the allowed set (chk_book_copies_status)
+    BEGIN
+        INSERT INTO book_copies (book_id, copy_number, copy_status)
+        VALUES (1, 99, 'broken');
+        RAISE EXCEPTION 'unexpected: chk_book_copies_status did not fire';
+    EXCEPTION WHEN check_violation THEN
+        RAISE NOTICE 'OK: copy_status=broken rejected by chk_book_copies_status';
+    END;
+
+    -- member_id must reference an existing member (fk_borrowings_member)
+    BEGIN
+        INSERT INTO borrowings (member_id, copy_id, due_date)
+        VALUES (999, 4, '2026-12-31');
+        RAISE EXCEPTION 'unexpected: fk_borrowings_member did not fire';
+    EXCEPTION WHEN foreign_key_violation THEN
+        RAISE NOTICE 'OK: member_id=999 rejected by fk_borrowings_member';
+    END;
+END $$;
+
+-- (b) Reference copies of the same checks for manual line-by-line testing
+--     (uncomment to run individually):
 /*
--- ❌ rating out of range
-INSERT INTO reviews (review_id, member_id, book_id, rating)
-VALUES (11, 1, 1, 6);
-
--- ❌ invalid copy status
-INSERT INTO book_copies (copy_id, book_id, copy_number, copy_status)
-VALUES (21, 1, 4, 'broken');
-
--- ❌ invalid FK
-INSERT INTO borrowings (borrowing_id, member_id, copy_id, borrowed_at, due_date)
-VALUES (11, 999, 1, '2025-01-01', '2025-02-01');
+INSERT INTO reviews (member_id, book_id, rating) VALUES (1, 5, 6);                    -- rating > 5
+INSERT INTO book_copies (book_id, copy_number, copy_status) VALUES (1, 99, 'broken'); -- bad status
+INSERT INTO borrowings (member_id, copy_id, due_date) VALUES (999, 4, '2026-12-31');  -- bad FK
 */
 
+-- ================================================================
+-- END OF DML SCRIPT
 -- ================================================================
