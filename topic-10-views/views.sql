@@ -117,16 +117,10 @@ SELECT
         FROM borrowings br
         WHERE br.member_id = m.member_id
           AND br.returned_at IS NULL
-          AND br.due_date < CURRENT_DATE
-    ) AS overdue_count
-FROM members m
-WHERE EXISTS (
-    SELECT 1
-    FROM borrowings br
-    WHERE br.member_id = m.member_id
-      AND br.returned_at IS NULL
-      AND br.due_date < CURRENT_DATE
-);
+    ) AS active_books_count
+FROM members m;
+
+
 
 -- ================================================================
 -- VIEW BASED ON ANOTHER VIEW
