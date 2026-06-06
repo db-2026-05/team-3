@@ -40,9 +40,10 @@
 
 
 -- ================================================================
--- HORIZONTAL VIEW: book_catalog
+-- SQL VIEWS (TOPIC 10)
+-- Library Management System
+-- Requires: ddl.sql executed first
 -- ================================================================
--- Author: [ім'я учасника]
 -- Purpose: Забезпечити сокращену версію каталогу книг
 --          (без фізичних копій та відгуків) для публічного перегляду.
 --
@@ -60,13 +61,12 @@ SELECT
     isbn,
     publication_year,
     category_id
-FROM books
-ORDER BY title;
+FROM books;
 
 
 -- ================================================================
--- VERTICAL VIEW
--- Purpose: останні відгуки (фільтр по часу)
+-- VERTICAL VIEW: recent_reviews
+-- Purpose: Відгуки за останні 30 днів
 -- ================================================================
 CREATE OR REPLACE VIEW recent_reviews AS
 SELECT *
@@ -75,8 +75,8 @@ WHERE created_at >= CURRENT_DATE - INTERVAL '30 days';
 
 
 -- ================================================================
--- MIXED VIEW
--- Purpose: доступні копії книг
+-- MIXED VIEW: available_copies
+-- Purpose: Доступні копії книг
 -- ================================================================
 CREATE OR REPLACE VIEW available_copies AS
 SELECT
@@ -88,7 +88,8 @@ WHERE copy_status = 'available';
 
 
 -- ================================================================
--- JOIN VIEW
+-- JOIN VIEW: member_review
+-- Purpose: Відгуки разом з користувачами та книгами
 -- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
@@ -106,7 +107,8 @@ JOIN books b ON b.book_id = r.book_id;
 
 
 -- ================================================================
--- SUBQUERY VIEW (REAL SUBQUERY, NOT WINDOW FUNCTION)
+-- SUBQUERY VIEW: members_with_book_count
+-- Purpose: Кількість активних позичених книг
 -- ================================================================
 CREATE OR REPLACE VIEW members_with_book_count AS
 SELECT
@@ -119,7 +121,6 @@ SELECT
           AND br.returned_at IS NULL
     ) AS active_books_count
 FROM members m;
-
 
 
 -- ================================================================
@@ -136,10 +137,10 @@ SELECT
     review_text
 FROM member_review;
 
+
 -- ================================================================
 -- UNION VIEW: library_activity
 -- ================================================================
--- Author: [ім'я]
 -- Purpose: Об'єднати всі активні дії члена бібліотеки
 --          (видачу книг та резервацію).
 --
@@ -160,6 +161,7 @@ FROM member_review;
 --   - RESERVATION: only status IN ('pending', 'assigned')
 -- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
+
 SELECT
     m.member_id,
     m.first_name || ' ' || m.last_name AS member_name,
@@ -191,7 +193,6 @@ WHERE r.reservation_status IN ('pending', 'assigned');
 -- ================================================================
 -- UPDATABLE VIEW WITH CHECK OPTION: high_rated_reviews
 -- ================================================================
--- Author: [ім'я]
 -- Purpose: Забезпечити шар, через який можна редагувати тільки
 --          позитивні відгуки (rating >= 4).
 --          Запобігає помилковому зниженню рейтингу через цей view.
@@ -216,9 +217,13 @@ FROM reviews
 WHERE rating >= 4
 WITH CHECK OPTION;
 
+-- NOTE:
+-- WITH CHECK OPTION гарантує:
+-- INSERT/UPDATE через view НЕ може створити rating < 4
+
 
 -- ================================================================
--- ANALYTICS VIEW
+-- ANALYTICS VIEW: popular_books
 -- ================================================================
 CREATE OR REPLACE VIEW popular_books AS
 SELECT
@@ -263,7 +268,7 @@ JOIN books b ON b.book_id = bc.book_id;
 
 
 -- ================================================================
--- OPTIONAL: overdue borrowings
+-- OVERDUE BORROWINGS VIEW
 -- ================================================================
 CREATE OR REPLACE VIEW overdue_borrowings AS
 SELECT
@@ -282,7 +287,7 @@ WHERE br.returned_at IS NULL
 
 
 -- ================================================================
--- DEMO QUERIES (DETERMINISTIC OUTPUT)
+-- DEMO QUERIES (SAFE + DETERMINISTIC)
 -- ================================================================
 SELECT * FROM book_catalog ORDER BY book_id LIMIT 3;
 SELECT * FROM recent_reviews ORDER BY created_at DESC LIMIT 3;
