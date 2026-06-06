@@ -79,7 +79,6 @@ WHERE copy_status = 'available';
 
 -- ================================================================
 -- JOIN VIEW
--- Purpose: повна інформація про відгуки (user + book + review)
 -- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
@@ -98,7 +97,6 @@ JOIN books b ON b.book_id = r.book_id;
 
 -- ================================================================
 -- SUBQUERY VIEW (REAL SUBQUERY, NOT WINDOW FUNCTION)
--- Purpose: аналітика — кількість активних книг у користувача
 -- ================================================================
 CREATE OR REPLACE VIEW members_with_book_count AS
 SELECT
@@ -107,11 +105,11 @@ SELECT
     (
         SELECT COUNT(*)
         FROM borrowings br
-        JOIN book_copies bc ON bc.copy_id = br.copy_id
         WHERE br.member_id = m.member_id
           AND br.returned_at IS NULL
     ) AS active_books_count
 FROM members m;
+
 
 
 -- ================================================================
@@ -119,30 +117,17 @@ FROM members m;
 -- ================================================================
 CREATE OR REPLACE VIEW member_review_details AS
 SELECT
-    s.review_id,
-    s.member_id,
-    s.member_name,
-    s.book_id,
-    b.title,
-    s.rating,
-    s.review_text
-FROM member_review s
-JOIN books b ON b.book_id = s.book_id;
-
+    review_id,
+    member_id,
+    member_name,
+    book_id,
+    title,
+    rating,
+    review_text
+FROM member_review
 
 -- ================================================================
 -- UNION VIEW: library_activity
--- Purpose:
--- повна історія активності бібліотеки (видачі + резервації)
---
--- WHY UNION ALL:
--- - borrowings і reservations — різні домени даних
--- - це НЕ дублікати, а різні типи подій
--- - UNION ALL зберігає повну історію без втрат
--- - UNION був би неправильний (може видаляти події)
---
--- IMPORTANT:
--- ВИРІВНЯНА СТРУКТУРА ОБОХ SELECT
 -- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
 
@@ -176,10 +161,6 @@ WHERE r.reservation_status IN ('pending', 'assigned');
 
 -- ================================================================
 -- CHECK OPTION VIEW
--- Purpose:
--- дозволяє змінювати тільки high-rated reviews (>=4)
---
--- BUSINESS RULE:
 -- quality control layer для модерації відгуків
 -- ================================================================
 CREATE OR REPLACE VIEW high_rated_reviews AS
@@ -194,11 +175,6 @@ SELECT
 FROM reviews
 WHERE rating >= 4
 WITH CHECK OPTION;
-
--- DEMO (optional):
--- INSERT INTO high_rated_reviews (member_id, book_id, rating, review_text, created_at, updated_at)
--- VALUES (1, 1, 2, 'Bad book', NOW(), NOW());
--- → ERROR: new row violates check option
 
 
 -- ================================================================
