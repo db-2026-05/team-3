@@ -124,13 +124,12 @@ SELECT
     title,
     rating,
     review_text
-FROM member_review
+FROM member_review;
 
 -- ================================================================
 -- UNION VIEW: library_activity
 -- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
-
 SELECT
     m.member_id,
     m.first_name || ' ' || m.last_name AS member_name,
