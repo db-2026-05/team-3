@@ -35,13 +35,15 @@
 -- ================================================================
 -- SQL VIEWS (TOPIC 10)
 -- Library Management System
--- Schema: ddl.sql (PostgreSQL)
+-- Schema reference: ddl.sql
 -- ================================================================
 
--- ================================================================
--- HORIZONTAL VIEW
--- ================================================================
 
+-- ================================================================
+-- HORIZONTAL VIEW: book_metadata
+-- Purpose: мінімальна інформація про книгу для каталогу
+-- Related tables: books
+-- ================================================================
 CREATE OR REPLACE VIEW book_metadata AS
 SELECT
     book_id,
@@ -50,10 +52,12 @@ SELECT
     publication_year
 FROM books;
 
--- ================================================================
--- VERTICAL VIEW
--- ================================================================
 
+-- ================================================================
+-- VERTICAL VIEW: best_reviews
+-- Purpose: тільки високі оцінки (5★)
+-- Related tables: reviews
+-- ================================================================
 CREATE OR REPLACE VIEW best_reviews AS
 SELECT
     review_id,
@@ -64,10 +68,12 @@ SELECT
 FROM reviews
 WHERE rating = 5;
 
--- ================================================================
--- MIXED VIEW
--- ================================================================
 
+-- ================================================================
+-- MIXED VIEW: available_copies
+-- Purpose: доступні фізичні копії книг
+-- Related tables: book_copies
+-- ================================================================
 CREATE OR REPLACE VIEW available_copies AS
 SELECT
     copy_id,
@@ -76,10 +82,11 @@ SELECT
 FROM book_copies
 WHERE copy_status = 'available';
 
--- ================================================================
--- JOIN VIEW
--- ================================================================
 
+-- ================================================================
+-- JOIN VIEW: member_review
+-- Purpose: відгуки + користувач + книга
+-- ================================================================
 CREATE OR REPLACE VIEW member_review AS
 SELECT
     m.member_id,
@@ -93,24 +100,27 @@ FROM reviews r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id;
 
--- ================================================================
--- SUBQUERY VIEW (FIXED → JOIN instead of subquery)
--- ================================================================
 
+-- ================================================================
+-- SUBQUERY VIEW (TRUE SUBQUERY REQUIREMENT)
+-- IMPORTANT: реалізовано через correlated subquery
+-- ================================================================
 CREATE OR REPLACE VIEW member_review_sub AS
 SELECT
+    r.review_id,
     r.member_id,
-    m.first_name,
+    (SELECT m.first_name
+     FROM members m
+     WHERE m.member_id = r.member_id) AS first_name,
     r.book_id,
     r.rating,
     r.review_text
-FROM reviews r
-JOIN members m ON m.member_id = r.member_id;
+FROM reviews r;
+
 
 -- ================================================================
 -- VIEW BASED ON ANOTHER VIEW
 -- ================================================================
-
 CREATE OR REPLACE VIEW member_review_details AS
 SELECT
     b.title,
@@ -121,11 +131,13 @@ SELECT
 FROM member_review_sub s
 JOIN books b ON b.book_id = s.book_id;
 
--- ================================================================
--- UNION VIEW (FIXED → UNION ALL)
--- ================================================================
 
+-- ================================================================
+-- UNION VIEW (FIXED LOGIC)
+-- NOTE: обидві частини тепер описують "активні дії"
+-- ================================================================
 CREATE OR REPLACE VIEW library_activity AS
+
 SELECT
     m.member_id,
     CONCAT(m.first_name, ' ', m.last_name) AS member_name,
@@ -149,12 +161,14 @@ SELECT
 FROM reservations r
 JOIN members m ON m.member_id = r.member_id
 JOIN books b ON b.book_id = r.book_id
-WHERE r.reservation_status = 'pending';
+WHERE r.reservation_status IN ('pending', 'assigned');
+
 
 -- ================================================================
--- UPDATABLE VIEW WITH CHECK OPTION (FIXED COMMENT)
+-- UPDATABLE VIEW WITH CHECK OPTION (CORRECT LOGIC)
+-- NOTE: CHECK OPTION гарантує видимість рядка після UPDATE/INSERT
+-- NULL rating не проходить WHERE (FALSE/UNKNOWN → виключається)
 -- ================================================================
-
 CREATE OR REPLACE VIEW high_rated_reviews AS
 SELECT
     review_id,
@@ -166,16 +180,13 @@ SELECT
     updated_at
 FROM reviews
 WHERE rating >= 4
+AND rating IS NOT NULL
 WITH CHECK OPTION;
 
--- NOTE:
--- NULL rating automatically excluded by WHERE condition,
--- so it never enters this view and is not checked by CHECK OPTION.
 
 -- ================================================================
--- BUSINESS VIEW: OVERDUE BORROWINGS
+-- BUSINESS VIEW: overdue borrowings
 -- ================================================================
-
 CREATE OR REPLACE VIEW overdue_borrowings AS
 SELECT
     br.borrowing_id,
@@ -191,10 +202,10 @@ JOIN books b ON b.book_id = bc.book_id
 WHERE br.returned_at IS NULL
   AND br.due_date < CURRENT_TIMESTAMP;
 
--- ================================================================
--- BUSINESS VIEW: POPULAR BOOKS
--- ================================================================
 
+-- ================================================================
+-- BUSINESS VIEW: popular_books
+-- ================================================================
 CREATE OR REPLACE VIEW popular_books AS
 SELECT
     b.book_id,
@@ -203,5 +214,19 @@ SELECT
     AVG(r.rating) AS avg_rating
 FROM books b
 LEFT JOIN reviews r ON r.book_id = b.book_id
-GROUP BY b.book_id, b.title
-HAVING COUNT(r.review_id) > 0;
+GROUP BY b.book_id, b.title;
+
+
+-- ================================================================
+-- DEMO SELECTS
+-- ================================================================
+
+SELECT * FROM book_metadata LIMIT 3;
+SELECT * FROM best_reviews LIMIT 3;
+SELECT * FROM available_copies LIMIT 3;
+SELECT * FROM member_review LIMIT 3;
+SELECT * FROM member_review_sub LIMIT 3;
+SELECT * FROM library_activity LIMIT 3;
+SELECT * FROM high_rated_reviews LIMIT 3;
+SELECT * FROM overdue_borrowings LIMIT 3;
+SELECT * FROM popular_books LIMIT 3;
